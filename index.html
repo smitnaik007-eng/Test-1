@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Drywell Temperature Calibrator</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -62,12 +65,20 @@
       z-index: 30;
     }
     .title {
-      font-size: 0.98rem;
+      font-size: 0.96rem;
       font-weight: 800;
       letter-spacing: 0.03em;
       display: flex;
       align-items: center;
       gap: 8px;
+    }
+    .ver-tag {
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: var(--accent);
+      background: rgba(56, 189, 248, 0.14);
+      padding: 2px 6px;
+      border-radius: 6px;
     }
     .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--danger); display: inline-block; flex-shrink: 0; }
     .dot.connected { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
@@ -425,6 +436,7 @@
       <div class="title">
         <span id="connDot" class="dot"></span>
         <span>DRYWELL CALIBRATOR</span>
+        <span class="ver-tag">v3</span>
       </div>
       <div class="ble-status">
         <span id="faultBadge" class="badge fault" style="display:none;">RTD FAULT</span>
@@ -939,7 +951,7 @@
     }
 
     // =========================================================================
-    // DUAL-PROBE CHART.JS
+    // DUAL-PROBE CHART.JS (0.001 °C Y-AXIS TICKS)
     // =========================================================================
     const ctx = document.getElementById("tempChart").getContext("2d");
     const tempChart = new Chart(ctx, {
@@ -958,7 +970,13 @@
         animation: false,
         scales: {
           x: { ticks: { color: "#64748b", maxTicksLimit: 6 }, grid: { color: "#1e293b" } },
-          y: { ticks: { color: "#94a3b8" }, grid: { color: "#1e293b" } }
+          y: {
+            ticks: {
+              color: "#94a3b8",
+              callback: (val) => Number(val).toFixed(3)
+            },
+            grid: { color: "#1e293b" }
+          }
         },
         plugins: { legend: { labels: { color: "#cbd5e1", boxWidth: 14, font: { size: 11 } } } }
       }
@@ -1397,7 +1415,6 @@
       const delta = live.eok ? Number((live.et - live.t).toFixed(3)) : "";
       const uiStable = live.ok || (live.st > 0 && live.st <= 0.050 && Math.abs(live.t - live.s) <= 0.15);
 
-      // Logs true ESP32 calibrated values plus damped display values for traceability
       const row = {
         Timestamp: new Date(now).toISOString(),
         Time: timeStr,
@@ -1446,7 +1463,6 @@
         XLSX.utils.book_append_sheet(wb, ws, "Drywell_Log");
         XLSX.writeFile(wb, `Drywell_Log_${stamp}.xlsx`);
       } else {
-        // Offline CSV fallback
         const headers = Object.keys(logRows[0]);
         const csv = [
           headers.join(","),
