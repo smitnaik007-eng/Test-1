@@ -186,7 +186,7 @@
       background: var(--sub);
       border: 1px solid var(--border-hi);
       border-radius: 12px;
-      padding: 12px 10px;
+      padding: 12px 8px;
       text-align: center;
       display: flex;
       flex-direction: column;
@@ -197,22 +197,23 @@
       border-color: rgba(167, 139, 250, 0.35);
     }
     .probe-label {
-      font-size: clamp(0.66rem, 2.2vw, 0.78rem);
+      font-size: clamp(0.65rem, 2.2vw, 0.78rem);
       color: var(--muted);
       text-transform: uppercase;
       letter-spacing: 0.05em;
       font-weight: 700;
     }
     .probe-val {
-      font-size: clamp(1.45rem, 5.5vw, 2.55rem);
+      font-size: clamp(1.22rem, 4.7vw, 2.35rem);
       font-weight: 800;
       font-variant-numeric: tabular-nums;
       line-height: 1.1;
       color: var(--accent);
+      white-space: nowrap;
     }
     .probe-card.ext-card .probe-val { color: var(--ext); }
     .probe-sub {
-      font-size: clamp(0.68rem, 2.1vw, 0.8rem);
+      font-size: clamp(0.66rem, 2.1vw, 0.79rem);
       color: var(--muted);
       font-variant-numeric: tabular-nums;
     }
@@ -227,7 +228,36 @@
       text-align: center;
     }
     .strip-item span { display: block; font-size: 0.7rem; color: var(--muted); text-transform: uppercase; }
-    .strip-item strong { font-size: 0.92rem; font-variant-numeric: tabular-nums; }
+    .strip-item strong { font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+
+    /* Display Filter Bar */
+    .filter-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+    .filter-label { font-size: 0.75rem; color: var(--muted); font-weight: 700; text-transform: uppercase; }
+    .filter-group { display: flex; gap: 6px; }
+    .filter-btn {
+      background: var(--sub);
+      border: 1px solid var(--border-hi);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 0.74rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .filter-btn.active {
+      background: rgba(56, 189, 248, 0.16);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
 
     /* Power Bar */
     .power-wrap { margin-top: 12px; }
@@ -417,7 +447,7 @@
     </nav>
 
     <!-- =================================================================== -->
-    <!-- TAB 1: CONTROL & SIDE-BY-SIDE DUAL PROBE READOUTS                   -->
+    <!-- TAB 1: CONTROL & SIDE-BY-SIDE DUAL PROBE READOUTS (0.001 °C)        -->
     <!-- =================================================================== -->
     <div class="window active" id="win0">
       <div class="card">
@@ -425,7 +455,7 @@
           <!-- Left: Internal Control Probe -->
           <div class="probe-card">
             <div class="probe-label">Internal Control</div>
-            <div class="probe-val" id="dispIntTemp">--.-- °C</div>
+            <div class="probe-val" id="dispIntTemp">--.--- °C</div>
             <div>
               <span id="stabBadge" class="badge warn">Settling (±---)</span>
             </div>
@@ -435,7 +465,7 @@
           <!-- Right: External Monitor Probe -->
           <div class="probe-card ext-card">
             <div class="probe-label">External Monitor</div>
-            <div class="probe-val" id="dispExtTemp">--.-- °C</div>
+            <div class="probe-val" id="dispExtTemp">--.--- °C</div>
             <div>
               <span id="extBadge" class="badge">Not Connected</span>
             </div>
@@ -450,11 +480,21 @@
           </div>
           <div class="strip-item">
             <span>Delta (Ext−Int)</span>
-            <strong id="dispDelta" style="color:var(--ext);">--.-- °C</strong>
+            <strong id="dispDelta" style="color:var(--ext);">--.--- °C</strong>
           </div>
           <div class="strip-item">
             <span>Zone / Output</span>
             <strong id="dispZoneState">Z1 • OFF</strong>
+          </div>
+        </div>
+
+        <!-- Display-Only Damping Selector (Does Not Affect ESP32 PID) -->
+        <div class="filter-bar">
+          <span class="filter-label">Display Damping (UI Only)</span>
+          <div class="filter-group">
+            <button class="filter-btn" id="flt_1" onclick="setDisplayFilter(1)">Off</button>
+            <button class="filter-btn active" id="flt_10" onclick="setDisplayFilter(10)">Smooth (5s)</button>
+            <button class="filter-btn" id="flt_20" onclick="setDisplayFilter(20)">High (10s)</button>
           </div>
         </div>
 
@@ -483,7 +523,10 @@
       <div class="card">
         <div class="card-header">
           <span class="card-title">Live Dual-Probe Trend</span>
-          <button class="btn btn-ghost btn-sm" onclick="clearChart()">Clear Graph</button>
+          <div class="row">
+            <button id="btnChartScale" class="btn btn-ghost btn-sm" onclick="toggleChartScale()">Scale: ±0.25°C</button>
+            <button class="btn btn-ghost btn-sm" onclick="clearChart()">Clear Graph</button>
+          </div>
         </div>
         <div class="chart-box">
           <canvas id="tempChart"></canvas>
@@ -513,7 +556,7 @@
           <div>
             <label class="field-lbl">Wait for Stable?</label>
             <select id="profWaitStable">
-              <option value="1" selected>Yes (wait ±0.02°C)</option>
+              <option value="1" selected>Yes (wait ±0.05°C)</option>
               <option value="0">No (within ±0.10°C)</option>
             </select>
           </div>
@@ -754,11 +797,64 @@
     let audioCtx = null;
     let lastPacketTs = 0;
 
+    // UI-Only Adaptive Display Filter (Does Not Touch ESP32 Control Loop)
+    let displayFilterN = 10; // 1 = Off, 10 = 5s @ 2Hz, 20 = 10s @ 2Hz
+    let intDispBuf = [];
+    let extDispBuf = [];
+    let useCalScale = true;  // Minimum ±0.25°C Y-axis window around setpoint
+
     const live = {
       t: 25.000, r: 25.000, s: 25.000, p: 0.0,
       en: false, f: 0, z: 1, st: 0.000, ok: false,
-      et: 0.000, er: 0.000, eok: false
+      et: 0.000, er: 0.000, eok: false,
+      dispT: 25.000, dispEt: 0.000
     };
+
+    function computeAdaptiveSmooth(buf, val, maxN) {
+      if (maxN <= 1) {
+        buf.length = 0;
+        buf.push(val);
+        return val;
+      }
+      if (buf.length > 0) {
+        const prevAvg = buf.reduce((a, b) => a + b, 0) / buf.length;
+        // Fast-track immediately on genuine ramps (> 0.15°C shift)
+        if (Math.abs(val - prevAvg) > 0.15) {
+          buf.length = 0;
+        }
+      }
+      buf.push(val);
+      while (buf.length > maxN) buf.shift();
+      return buf.reduce((a, b) => a + b, 0) / buf.length;
+    }
+
+    function setDisplayFilter(n) {
+      displayFilterN = n;
+      intDispBuf = [];
+      extDispBuf = [];
+      [1, 10, 20].forEach(k => {
+        const el = document.getElementById("flt_" + k);
+        if (el) el.classList.toggle("active", k === n);
+      });
+    }
+
+    function toggleChartScale() {
+      useCalScale = !useCalScale;
+      document.getElementById("btnChartScale").textContent =
+        useCalScale ? "Scale: ±0.25°C" : "Scale: Auto";
+      applyChartScale();
+      tempChart.update();
+    }
+
+    function applyChartScale() {
+      if (useCalScale) {
+        tempChart.options.scales.y.suggestedMin = live.s - 0.25;
+        tempChart.options.scales.y.suggestedMax = live.s + 0.25;
+      } else {
+        delete tempChart.options.scales.y.suggestedMin;
+        delete tempChart.options.scales.y.suggestedMax;
+      }
+    }
 
     // =========================================================================
     // KEEP-ALIVE (WAKE LOCK + SILENT AUDIO) & 3.5s WATCHDOG
@@ -851,8 +947,8 @@
       data: {
         labels: [],
         datasets: [
-          { label: "Internal (°C)", data: [], borderColor: "#38bdf8", borderWidth: 2, pointRadius: 0, tension: 0.15 },
-          { label: "External (°C)", data: [], borderColor: "#a78bfa", borderWidth: 2, pointRadius: 0, tension: 0.15 },
+          { label: "Internal (°C)", data: [], borderColor: "#38bdf8", borderWidth: 2, pointRadius: 0, tension: 0.2 },
+          { label: "External (°C)", data: [], borderColor: "#a78bfa", borderWidth: 2, pointRadius: 0, tension: 0.2 },
           { label: "Setpoint (°C)", data: [], borderColor: "#10b981", borderWidth: 1.5, borderDash: [5, 5], pointRadius: 0 }
         ]
       },
@@ -908,6 +1004,8 @@
       txChar.addEventListener("characteristicvaluechanged", handleNotification);
 
       lastPacketTs = Date.now();
+      intDispBuf = [];
+      extDispBuf = [];
       document.getElementById("connDot").className = "dot connected";
       const badge = document.getElementById("connBadge");
       badge.textContent = "Connected";
@@ -972,6 +1070,15 @@
             live.et  = typeof msg.et === "number" ? msg.et : 0;
             live.er  = typeof msg.er === "number" ? msg.er : 0;
             live.eok = msg.eok === 1;
+
+            // Compute UI-only damped display values (0.001°C)
+            live.dispT = computeAdaptiveSmooth(intDispBuf, live.t, displayFilterN);
+            if (live.eok) {
+              live.dispEt = computeAdaptiveSmooth(extDispBuf, live.et, displayFilterN);
+            } else {
+              extDispBuf.length = 0;
+            }
+
             updateTelemetryUI();
             tickProfiler();
             tickLogger();
@@ -1001,13 +1108,15 @@
     }
 
     function updateTelemetryUI() {
-      // Main probe readouts at 0.01°C resolution
-      document.getElementById("dispIntTemp").textContent = live.t.toFixed(2) + " °C";
+      // Main probe readouts at 0.001°C resolution (UI-damped)
+      document.getElementById("dispIntTemp").textContent = live.dispT.toFixed(3) + " °C";
       document.getElementById("dispIntRaw").textContent  = "Raw: " + live.r.toFixed(3) + " °C";
       document.getElementById("dispSet").textContent     = live.s.toFixed(2) + " °C";
 
+      // Stability badge: Green within ±0.050°C (ESP32 internal stability logic untouched)
       const stabEl = document.getElementById("stabBadge");
-      if (live.ok) {
+      const uiStable = live.ok || (live.st > 0 && live.st <= 0.050 && Math.abs(live.t - live.s) <= 0.15);
+      if (uiStable) {
         stabEl.className = "badge connected";
         stabEl.textContent = `Stable (±${live.st.toFixed(3)})`;
       } else {
@@ -1015,21 +1124,21 @@
         stabEl.textContent = `Settling (±${live.st.toFixed(3)})`;
       }
 
-      // External Monitor Probe Card
+      // External Monitor Probe Card (0.001°C)
       const extBadge = document.getElementById("extBadge");
       if (live.eok) {
-        document.getElementById("dispExtTemp").textContent = live.et.toFixed(2) + " °C";
+        document.getElementById("dispExtTemp").textContent = live.dispEt.toFixed(3) + " °C";
         document.getElementById("dispExtRaw").textContent  = "Raw: " + live.er.toFixed(3) + " °C";
         extBadge.className = "badge ext";
         extBadge.textContent = "Monitor Active";
-        const delta = live.et - live.t;
-        document.getElementById("dispDelta").textContent = (delta >= 0 ? "+" : "") + delta.toFixed(2) + " °C";
+        const delta = live.dispEt - live.dispT;
+        document.getElementById("dispDelta").textContent = (delta >= 0 ? "+" : "") + delta.toFixed(3) + " °C";
       } else {
-        document.getElementById("dispExtTemp").textContent = "--.-- °C";
+        document.getElementById("dispExtTemp").textContent = "--.--- °C";
         document.getElementById("dispExtRaw").textContent  = "Raw: --.--- °C";
         extBadge.className = "badge";
         extBadge.textContent = "Not Connected";
-        document.getElementById("dispDelta").textContent = "--.-- °C";
+        document.getElementById("dispDelta").textContent = "--.--- °C";
       }
 
       document.getElementById("dispZoneState").textContent = `Z${live.z} • ${live.en ? "ACTIVE" : "OFF"}`;
@@ -1066,16 +1175,17 @@
         cf.style.display = "none";
       }
 
-      // Update Dual-Probe Chart
+      // Update Dual-Probe Chart (with UI-damped trace & Calibrator Scale)
       const nowStr = new Date().toLocaleTimeString([], { minute: "2-digit", second: "2-digit" });
       tempChart.data.labels.push(nowStr);
-      tempChart.data.datasets[0].data.push(live.t);
-      tempChart.data.datasets[1].data.push(live.eok ? live.et : null);
+      tempChart.data.datasets[0].data.push(live.dispT);
+      tempChart.data.datasets[1].data.push(live.eok ? live.dispEt : null);
       tempChart.data.datasets[2].data.push(live.s);
       if (tempChart.data.labels.length > 240) {
         tempChart.data.labels.shift();
         tempChart.data.datasets.forEach(ds => ds.data.shift());
       }
+      applyChartScale();
       tempChart.update();
     }
 
@@ -1113,7 +1223,7 @@
           <td${activeMark}>${i + 1}</td>
           <td${activeMark}><strong>${st.target.toFixed(2)} °C</strong></td>
           <td${activeMark}>${st.minutes} min</td>
-          <td${activeMark}>${st.waitStable ? "Stable (±0.02)" : "Band (±0.10)"}</td>
+          <td${activeMark}>${st.waitStable ? "Stable (±0.05)" : "Band (±0.10)"}</td>
           <td${activeMark}>
             <button class="btn btn-ghost btn-sm" onclick="removeProfileStep(${i})" ${profRunning ? "disabled" : ""}>✕</button>
           </td>
@@ -1198,10 +1308,11 @@
         `Step ${profIdx + 1} / ${profileSteps.length} — Target ${st.target.toFixed(2)} °C`;
 
       if (profPhase === "ramp") {
-        const reached = st.waitStable ? (err <= 0.15 && live.ok) : (err <= 0.10);
+        const isStabNow = live.ok || (live.st > 0 && live.st <= 0.050);
+        const reached = st.waitStable ? (err <= 0.15 && isStabNow) : (err <= 0.10);
         document.getElementById("profTimer").textContent = "Waiting";
         document.getElementById("profSubInfo").textContent =
-          `Block ${live.t.toFixed(2)} °C (Δ ${err.toFixed(2)} °C) • ${st.waitStable ? "Waiting for stability" : "Approaching target"}`;
+          `Block ${live.dispT.toFixed(3)} °C (Δ ${err.toFixed(3)} °C) • ${st.waitStable ? "Waiting for stability" : "Approaching target"}`;
         document.getElementById("profProgress").style.width = "0%";
         if (reached) {
           profPhase = "soak";
@@ -1284,20 +1395,24 @@
       const elapsedSec = Math.round((now - logStartTs) / 1000);
       const timeStr = new Date(now).toLocaleTimeString([], { hour12: false });
       const delta = live.eok ? Number((live.et - live.t).toFixed(3)) : "";
+      const uiStable = live.ok || (live.st > 0 && live.st <= 0.050 && Math.abs(live.t - live.s) <= 0.15);
 
+      // Logs true ESP32 calibrated values plus damped display values for traceability
       const row = {
         Timestamp: new Date(now).toISOString(),
         Time: timeStr,
         Elapsed_s: elapsedSec,
         Setpoint_C: Number(live.s.toFixed(2)),
         Internal_Cal_C: Number(live.t.toFixed(3)),
+        Internal_Display_C: Number(live.dispT.toFixed(3)),
         Internal_Raw_C: Number(live.r.toFixed(3)),
         External_Cal_C: live.eok ? Number(live.et.toFixed(3)) : "",
+        External_Display_C: live.eok ? Number(live.dispEt.toFixed(3)) : "",
         External_Raw_C: live.eok ? Number(live.er.toFixed(3)) : "",
         Delta_Ext_Int_C: delta,
         Power_Pct: Number(live.p.toFixed(1)),
         Stability_C: Number(live.st.toFixed(3)),
-        Stable: live.ok ? "YES" : "NO",
+        Stable: uiStable ? "YES" : "NO",
         Zone: live.z
       };
       logRows.push(row);
@@ -1312,11 +1427,11 @@
       tr.innerHTML = `
         <td>${timeStr}</td>
         <td>${live.s.toFixed(2)}</td>
-        <td>${live.t.toFixed(2)}</td>
-        <td>${live.eok ? live.et.toFixed(2) : "--"}</td>
-        <td>${live.eok ? (live.et - live.t).toFixed(2) : "--"}</td>
+        <td>${live.dispT.toFixed(3)}</td>
+        <td>${live.eok ? live.dispEt.toFixed(3) : "---"}</td>
+        <td>${live.eok ? (live.dispEt - live.dispT).toFixed(3) : "---"}</td>
         <td>${live.p.toFixed(0)}%</td>
-        <td>${live.ok ? "OK" : "…"}</td>
+        <td>${uiStable ? "OK" : "…"}</td>
       `;
       tb.insertBefore(tr, tb.firstChild);
       if (tb.children.length > 50) tb.removeChild(tb.lastChild);
