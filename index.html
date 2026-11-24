@@ -3,1112 +3,1434 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>Drywell Calibrator Controller</title>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <title>Drywell Temperature Calibrator</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <style>
     :root {
-      --bg: #0f172a;
-      --card: #1e293b;
-      --card-alt: #273549;
-      --border: #334155;
-      --text: #f8fafc;
-      --muted: #94a3b8;
+      --bg: #0b1120;
+      --card: #111827;
+      --sub: #0f172a;
+      --border: #1f2937;
+      --border-hi: #334155;
+      --text: #f3f4f6;
+      --muted: #9ca3af;
       --accent: #38bdf8;
-      --green: #22c55e;
-      --amber: #f59e0b;
-      --red: #ef4444;
-      --nav-h: 62px;
+      --ext: #a78bfa;
+      --heat: #f97316;
+      --cool: #06b6d4;
+      --ok: #10b981;
+      --warn: #f59e0b;
+      --danger: #ef4444;
     }
-    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
-    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); overflow-x: hidden; }
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body {
-      display: flex; flex-direction: column; min-height: 100dvh;
-      padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px));
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding-bottom: calc(70px + env(safe-area-inset-bottom));
     }
-
-    header {
-      background: var(--card); border-bottom: 1px solid var(--border);
-      padding: 10px 14px; display: flex; justify-content: space-between; align-items: center;
-      position: sticky; top: 0; z-index: 30; gap: 8px;
-    }
-    .brand { font-weight: 700; font-size: 1rem; display: flex; align-items: center; gap: 8px; min-width: 0; }
-    .brand span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--red); flex-shrink: 0; }
-    .dot.connected { background: var(--green); box-shadow: 0 0 8px var(--green); }
-    .dot.stale { background: var(--amber); }
-
-    button {
-      background: var(--accent); color: #0f172a; border: none; border-radius: 10px;
-      padding: 10px 14px; min-height: 44px; font-weight: 600; cursor: pointer; font-size: 0.92rem;
-      touch-action: manipulation;
-    }
-    button:active { transform: scale(0.98); }
-    button:disabled { opacity: 0.45; cursor: not-allowed; }
-    button.secondary { background: var(--card-alt); color: var(--text); border: 1px solid var(--border); }
-    button.danger { background: var(--red); color: #fff; }
-    button.success { background: var(--green); color: #052e16; }
-    button.sm { min-height: 36px; padding: 6px 10px; font-size: 0.82rem; border-radius: 8px; }
-
-    /* Mobile-First Bottom Navigation Bar */
-    nav.tabs {
-      position: fixed; bottom: 0; left: 0; right: 0; z-index: 40;
-      display: grid; grid-template-columns: repeat(5, 1fr);
-      background: var(--card); border-top: 1px solid var(--border);
-      padding-bottom: env(safe-area-inset-bottom, 0px);
-      height: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px));
-    }
-    nav.tabs button {
-      background: transparent; color: var(--muted); border-radius: 0; min-height: 100%;
-      padding: 6px 2px; border-top: 3px solid transparent;
-      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-      font-size: 0.72rem; font-weight: 600;
-    }
-    nav.tabs button .tab-ico { font-size: 1.15rem; line-height: 1; }
-    nav.tabs button.active {
-      color: var(--accent); border-top-color: var(--accent); background: rgba(56, 189, 248, 0.08);
-    }
-
-    /* Desktop / Tablet Top Navigation */
     @media (min-width: 720px) {
-      body { padding-bottom: 0; }
-      nav.tabs {
-        position: static; height: auto; border-top: none; border-bottom: 1px solid var(--border);
-        padding-bottom: 0;
-      }
-      nav.tabs button {
-        flex-direction: row; gap: 6px; padding: 12px 10px; font-size: 0.9rem;
-        border-top: none; border-bottom: 3px solid transparent;
-      }
-      nav.tabs button.active { border-bottom-color: var(--accent); border-top-color: transparent; }
+      body { padding-bottom: 24px; }
     }
 
-    main { flex: 1; padding: 12px; max-width: 980px; width: 100%; margin: 0 auto; }
-    .tab-pane { display: none; }
-    .tab-pane.active { display: block; }
-
-    .grid-2 { display: grid; grid-template-columns: 1fr; gap: 12px; }
-    @media (min-width: 680px) {
-      .grid-2 { grid-template-columns: 1fr 1fr; }
+    .app {
+      width: 100%;
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
     }
+
+    /* Sticky Topbar */
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 14px;
+      gap: 8px;
+      position: sticky;
+      top: 8px;
+      z-index: 30;
+    }
+    .title {
+      font-size: 0.98rem;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--danger); display: inline-block; flex-shrink: 0; }
+    .dot.connected { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+    .dot.stale { background: var(--warn); }
+
+    .ble-status { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .badge {
+      padding: 4px 9px;
+      border-radius: 999px;
+      font-size: 0.74rem;
+      font-weight: 700;
+      background: #1f2937;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .badge.connected { background: rgba(16, 185, 129, 0.16); color: var(--ok); }
+    .badge.warn { background: rgba(245, 158, 11, 0.18); color: var(--warn); }
+    .badge.fault { background: rgba(239, 68, 68, 0.22); color: var(--danger); }
+    .badge.ext { background: rgba(167, 139, 250, 0.18); color: var(--ext); }
+
+    /* Watchdog Banner */
+    .watchdog-banner {
+      display: none;
+      background: rgba(245, 158, 11, 0.16);
+      border: 1px solid var(--warn);
+      color: #fde68a;
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      text-align: center;
+    }
+
+    /* 5-Tab Navigation: Bottom Bar on Mobile, Top Bar on Desktop */
+    .nav-tabs {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 40;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 4px;
+      background: #0d1526;
+      border-top: 1px solid var(--border-hi);
+      padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+    }
+    @media (min-width: 720px) {
+      .nav-tabs {
+        position: static;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 6px;
+        gap: 6px;
+      }
+    }
+    .tab-btn {
+      background: transparent;
+      color: var(--muted);
+      border: none;
+      border-radius: 8px;
+      padding: 9px 4px;
+      font-weight: 700;
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: 0.15s;
+      min-height: 42px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+    }
+    @media (min-width: 720px) {
+      .tab-btn { font-size: 0.88rem; flex-direction: row; gap: 6px; }
+    }
+    .tab-btn.active {
+      background: #1e293b;
+      color: var(--accent);
+      box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.35);
+    }
+
+    .window { display: none; flex-direction: column; gap: 12px; }
+    .window.active { display: flex; }
 
     .card {
-      background: var(--card); border: 1px solid var(--border); border-radius: 14px;
-      padding: 14px; margin-bottom: 12px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
     }
-    .pv-box { text-align: center; padding: 10px 6px; }
-    .pv-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; gap: 6px; }
-    .pv-label { font-size: 0.76rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; }
-    .pv-value { font-size: clamp(2.3rem, 8vw, 3.1rem); font-weight: 800; font-variant-numeric: tabular-nums; margin: 6px 0; color: var(--accent); }
-    .pv-value.ext { color: var(--green); }
-    .pv-value.offline { color: var(--muted); }
-
-    .sub-metrics {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
-      border-top: 1px solid var(--border); padding-top: 10px; margin-top: 10px; font-size: 0.82rem;
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      gap: 8px;
+      flex-wrap: wrap;
     }
-    .sub-metrics div { display: flex; flex-direction: column; gap: 2px; }
-    .sub-metrics span { color: var(--muted); font-size: 0.72rem; }
-
-    .badge {
-      display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 0.74rem; font-weight: 700;
+    .card-title {
+      font-size: 0.84rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
     }
-    .badge.stable { background: rgba(34, 197, 94, 0.2); color: var(--green); }
-    .badge.settling { background: rgba(245, 158, 11, 0.2); color: var(--amber); }
-    .badge.fault { background: rgba(239, 68, 68, 0.25); color: var(--red); }
-    .badge.monitor { background: rgba(56, 189, 248, 0.16); color: var(--accent); }
 
-    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    .row-between { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
-
-    input[type="number"], input[type="password"], input[type="text"], select {
-      background: var(--bg); color: var(--text); border: 1px solid var(--border);
-      border-radius: 10px; padding: 10px 12px; font-size: 16px; min-height: 44px;
+    /* Side-by-Side Internal & External Probe Cards (Always 2 Columns) */
+    .probes-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
     }
-    input[type="number"] { width: 112px; }
-    .sp-controls { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; width: 100%; }
-    .sp-controls input { width: 100%; }
-
-    .preset-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
-    @media (min-width: 520px) { .preset-bar { grid-template-columns: repeat(6, 1fr); } }
-
-    .pwm-bar-wrap {
-      width: 100%; height: 10px; background: var(--bg); border-radius: 6px; overflow: hidden;
-      border: 1px solid var(--border); margin-top: 8px;
+    .probe-card {
+      background: var(--sub);
+      border: 1px solid var(--border-hi);
+      border-radius: 12px;
+      padding: 12px 10px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 6px;
     }
-    .pwm-bar-fill { height: 100%; width: 0%; background: var(--accent); transition: width 0.25s; }
+    .probe-card.ext-card {
+      border-color: rgba(167, 139, 250, 0.35);
+    }
+    .probe-label {
+      font-size: clamp(0.66rem, 2.2vw, 0.78rem);
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 700;
+    }
+    .probe-val {
+      font-size: clamp(1.45rem, 5.5vw, 2.55rem);
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.1;
+      color: var(--accent);
+    }
+    .probe-card.ext-card .probe-val { color: var(--ext); }
+    .probe-sub {
+      font-size: clamp(0.68rem, 2.1vw, 0.8rem);
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
 
-    canvas { width: 100%; height: 220px; background: #0b1120; border-radius: 10px; border: 1px solid var(--border); display: block; }
-    .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.78rem; color: var(--muted); margin-top: 8px; }
-    .legend span { display: inline-flex; align-items: center; gap: 5px; }
-    .swatch { width: 12px; height: 3px; border-radius: 2px; display: inline-block; }
+    .status-strip {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+      text-align: center;
+    }
+    .strip-item span { display: block; font-size: 0.7rem; color: var(--muted); text-transform: uppercase; }
+    .strip-item strong { font-size: 0.92rem; font-variant-numeric: tabular-nums; }
 
-    .table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    table { width: 100%; border-collapse: collapse; font-size: 0.86rem; min-width: 440px; }
-    th, td { padding: 9px 8px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
-    th { color: var(--muted); font-weight: 600; position: sticky; top: 0; background: var(--card); }
+    /* Power Bar */
+    .power-wrap { margin-top: 12px; }
+    .power-head { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--muted); margin-bottom: 5px; }
+    .power-track { width: 100%; height: 11px; background: var(--sub); border-radius: 999px; overflow: hidden; border: 1px solid var(--border); }
+    .power-fill { height: 100%; width: 0%; background: var(--accent); transition: width 0.25s, background 0.25s; }
 
-    .seg-toggle {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
-      background: var(--bg); padding: 4px; border-radius: 10px; border: 1px solid var(--border);
+    /* Manual Setpoint Row (No Presets) */
+    .setpoint-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    input[type="number"], input[type="password"], select {
+      background: var(--sub);
+      border: 1px solid var(--border-hi);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 16px;
+      font-weight: 600;
+      width: 100%;
+      min-height: 44px;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-weight: 700;
+      font-size: 0.88rem;
+      cursor: pointer;
+      min-height: 44px;
+      white-space: nowrap;
+      transition: opacity 0.15s;
+    }
+    .btn:hover { opacity: 0.9; }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-sm { padding: 6px 10px; font-size: 0.78rem; min-height: 34px; }
+    .btn-primary { background: var(--accent); color: #082f49; }
+    .btn-enable { background: var(--ok); color: #022c22; }
+    .btn-disable { background: var(--danger); color: #fff; }
+    .btn-warn { background: var(--warn); color: #1c1917; }
+    .btn-ghost { background: #1e293b; color: var(--text); border: 1px solid var(--border-hi); }
+
+    .chart-box { height: 240px; width: 100%; }
+
+    /* Profiler & Logger Tables */
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 8px;
+      align-items: end;
+    }
+    .field-lbl { font-size: 0.74rem; color: var(--muted); display: block; margin-bottom: 4px; font-weight: 600; }
+
+    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+    th, td { padding: 8px 6px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
+    th { color: var(--muted); font-weight: 700; font-size: 0.74rem; text-transform: uppercase; }
+
+    .interval-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+    .chip {
+      background: var(--sub);
+      border: 1px solid var(--border-hi);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .chip.active {
+      background: rgba(56, 189, 248, 0.16);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Calibration Sub-Switcher */
+    .pill-switch {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      background: var(--sub);
+      padding: 5px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
       margin-bottom: 12px;
     }
-    .seg-toggle button { background: transparent; color: var(--muted); min-height: 40px; padding: 8px; }
-    .seg-toggle button.active { background: var(--accent); color: #0f172a; }
-
-    .pin-overlay { text-align: center; padding: 28px 14px; }
-    .banner-warn {
-      background: rgba(245, 158, 11, 0.16); border: 1px solid var(--amber); color: #fde68a;
-      padding: 10px 12px; border-radius: 10px; font-size: 0.85rem; margin-bottom: 10px; display: none;
+    .pill-btn {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      font-weight: 700;
+      font-size: 0.82rem;
+      padding: 9px 8px;
+      border-radius: 7px;
+      cursor: pointer;
     }
-    .zone-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
-    .zone-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; color: var(--muted); }
-    .zone-grid input { width: 100%; }
+    .pill-btn.active { background: #1e293b; color: var(--accent); }
+    .pill-btn.active.ext { color: var(--ext); }
+
+    .cal-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 8px;
+    }
+    .cal-cell {
+      background: var(--sub);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .cal-pt { font-size: 0.8rem; font-weight: 700; color: var(--accent); }
+    .cal-pt.ext { color: var(--ext); }
+    .cal-cell input { padding: 6px 8px; font-size: 0.9rem; min-height: 36px; }
+
+    /* Zone PID Cards */
+    .zone-card {
+      background: var(--sub);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+    .zone-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .zone-name { font-weight: 700; font-size: 0.9rem; color: var(--accent); }
+    .zone-inputs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr) auto;
+      gap: 8px;
+      align-items: end;
+    }
+    @media (max-width: 560px) {
+      .zone-inputs { grid-template-columns: 1fr 1fr; }
+    }
+
+    /* PIN Lock Screen */
+    .lock-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 14px;
+      text-align: center;
+      gap: 12px;
+    }
+    .lock-form { display: flex; gap: 8px; max-width: 260px; width: 100%; }
+    .lock-err { color: var(--danger); font-size: 0.82rem; min-height: 18px; }
+
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .progress-bar { width: 100%; height: 8px; background: var(--sub); border-radius: 999px; overflow: hidden; margin-top: 8px; }
+    .progress-fill { height: 100%; width: 0%; background: var(--ok); transition: width 0.3s; }
   </style>
 </head>
 <body>
+  <div class="app">
+    <!-- Top Connection Bar -->
+    <div class="topbar">
+      <div class="title">
+        <span id="connDot" class="dot"></span>
+        <span>DRYWELL CALIBRATOR</span>
+      </div>
+      <div class="ble-status">
+        <span id="faultBadge" class="badge fault" style="display:none;">RTD FAULT</span>
+        <span id="connBadge" class="badge">Disconnected</span>
+        <button id="btnConnect" class="btn btn-primary btn-sm" onclick="toggleBLE()">Connect</button>
+      </div>
+    </div>
 
-<header>
-  <div class="brand">
-    <span id="connDot" class="dot"></span>
-    <span>Drywell Calibrator</span>
+    <div id="watchdogBanner" class="watchdog-banner">
+      Telemetry stalled (&gt;3.5s) — checking Bluetooth link...
+    </div>
+
+    <!-- 5-Tab Navigation -->
+    <nav class="nav-tabs">
+      <button class="tab-btn active" id="tab0" onclick="switchWindow(0)">Control</button>
+      <button class="tab-btn" id="tab1" onclick="switchWindow(1)">Profiler</button>
+      <button class="tab-btn" id="tab2" onclick="switchWindow(2)">Logger</button>
+      <button class="tab-btn" id="tab3" onclick="switchWindow(3)">Calib</button>
+      <button class="tab-btn" id="tab4" onclick="switchWindow(4)">PID</button>
+    </nav>
+
+    <!-- =================================================================== -->
+    <!-- TAB 1: CONTROL & SIDE-BY-SIDE DUAL PROBE READOUTS                   -->
+    <!-- =================================================================== -->
+    <div class="window active" id="win0">
+      <div class="card">
+        <div class="probes-grid">
+          <!-- Left: Internal Control Probe -->
+          <div class="probe-card">
+            <div class="probe-label">Internal Control</div>
+            <div class="probe-val" id="dispIntTemp">--.-- °C</div>
+            <div>
+              <span id="stabBadge" class="badge warn">Settling (±---)</span>
+            </div>
+            <div class="probe-sub" id="dispIntRaw">Raw: --.--- °C</div>
+          </div>
+
+          <!-- Right: External Monitor Probe -->
+          <div class="probe-card ext-card">
+            <div class="probe-label">External Monitor</div>
+            <div class="probe-val" id="dispExtTemp">--.-- °C</div>
+            <div>
+              <span id="extBadge" class="badge">Not Connected</span>
+            </div>
+            <div class="probe-sub" id="dispExtRaw">Raw: --.--- °C</div>
+          </div>
+        </div>
+
+        <div class="status-strip">
+          <div class="strip-item">
+            <span>Setpoint</span>
+            <strong id="dispSet" style="color:var(--accent);">25.00 °C</strong>
+          </div>
+          <div class="strip-item">
+            <span>Delta (Ext−Int)</span>
+            <strong id="dispDelta" style="color:var(--ext);">--.-- °C</strong>
+          </div>
+          <div class="strip-item">
+            <span>Zone / Output</span>
+            <strong id="dispZoneState">Z1 • OFF</strong>
+          </div>
+        </div>
+
+        <div class="power-wrap">
+          <div class="power-head">
+            <span>Output Power</span>
+            <span id="dispPower">0.0% (IDLE)</span>
+          </div>
+          <div class="power-track">
+            <div class="power-fill" id="powerBar"></div>
+          </div>
+        </div>
+
+        <!-- Manual Setpoint Only (No Preset Buttons) -->
+        <div class="setpoint-row">
+          <input type="number" id="inputSet" step="0.01" min="-30" max="150" value="25.00" placeholder="Target °C" onkeydown="if(event.key==='Enter') sendSetpoint()" />
+          <button class="btn btn-primary" onclick="sendSetpoint()">Set °C</button>
+          <button class="btn btn-enable" id="btnToggleOut" onclick="toggleOutput()">Start</button>
+        </div>
+
+        <button id="btnClearFault" class="btn btn-ghost" style="display:none; width:100%; margin-top:8px;" onclick="sendCmd('RSTFAULT')">
+          Clear RTD / Limit Fault
+        </button>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Live Dual-Probe Trend</span>
+          <button class="btn btn-ghost btn-sm" onclick="clearChart()">Clear Graph</button>
+        </div>
+        <div class="chart-box">
+          <canvas id="tempChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- TAB 2: AUTOMATED STEP PROFILER                                      -->
+    <!-- =================================================================== -->
+    <div class="window" id="win1">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Automated Step Sequencer</span>
+          <span id="profStatusBadge" class="badge">Idle</span>
+        </div>
+
+        <div class="form-grid" style="margin-bottom:10px;">
+          <div>
+            <label class="field-lbl">Target (°C)</label>
+            <input type="number" id="profTarget" step="0.1" min="-30" max="150" value="0.0" />
+          </div>
+          <div>
+            <label class="field-lbl">Soak Time (min)</label>
+            <input type="number" id="profMinutes" step="0.5" min="0.5" max="600" value="10" />
+          </div>
+          <div>
+            <label class="field-lbl">Wait for Stable?</label>
+            <select id="profWaitStable">
+              <option value="1" selected>Yes (wait ±0.02°C)</option>
+              <option value="0">No (within ±0.10°C)</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" onclick="addProfileStep()">+ Add Step</button>
+        </div>
+
+        <div class="row" style="justify-content:space-between; margin-bottom:10px;">
+          <div style="flex:1; min-width:170px;">
+            <label class="field-lbl">When Sequence Finishes</label>
+            <select id="profEndAction">
+              <option value="hold">Hold Final Setpoint</option>
+              <option value="stop">Stop Output (OFF)</option>
+            </select>
+          </div>
+          <div class="row" style="padding-top:16px;">
+            <button id="btnProfStart" class="btn btn-enable" onclick="startProfile()">Start</button>
+            <button id="btnProfSkip" class="btn btn-ghost" onclick="skipProfileStep()" disabled>Skip</button>
+            <button id="btnProfStop" class="btn btn-disable" onclick="stopProfile()" disabled>Stop</button>
+          </div>
+        </div>
+
+        <div id="profLiveBox" style="display:none; background:var(--sub); border:1px solid var(--border-hi); border-radius:10px; padding:10px; margin-bottom:10px;">
+          <div class="row" style="justify-content:space-between;">
+            <strong id="profStepInfo">Step 1 / 1</strong>
+            <span id="profTimer" style="color:var(--accent); font-weight:700;">--:--</span>
+          </div>
+          <div id="profSubInfo" style="font-size:0.8rem; color:var(--muted); margin-top:4px;">Ramping...</div>
+          <div class="progress-bar"><div id="profProgress" class="progress-fill"></div></div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Target (°C)</th>
+                <th>Soak (min)</th>
+                <th>Trigger</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="profTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- TAB 3: DATA LOGGER & EXCEL (.XLSX) EXPORT                           -->
+    <!-- =================================================================== -->
+    <div class="window" id="win2">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Data Logger</span>
+          <span id="logStatusBadge" class="badge">Stopped</span>
+        </div>
+
+        <label class="field-lbl">Logging Interval</label>
+        <div class="interval-chips" id="intervalChips">
+          <button class="chip active" onclick="setLogInterval(1, this)">1 s</button>
+          <button class="chip" onclick="setLogInterval(2, this)">2 s</button>
+          <button class="chip" onclick="setLogInterval(5, this)">5 s</button>
+          <button class="chip" onclick="setLogInterval(10, this)">10 s</button>
+          <button class="chip" onclick="setLogInterval(30, this)">30 s</button>
+          <button class="chip" onclick="setLogInterval(60, this)">1 min</button>
+          <button class="chip" onclick="setLogInterval(300, this)">5 min</button>
+        </div>
+
+        <div class="row" style="margin-bottom:12px;">
+          <div style="width:140px;">
+            <label class="field-lbl">Custom (sec)</label>
+            <input type="number" id="customLogSec" min="1" max="3600" step="1" value="1" onchange="applyCustomLogInterval()" />
+          </div>
+          <div class="row" style="padding-top:16px;">
+            <button id="btnLogToggle" class="btn btn-enable" onclick="toggleLogging()">Start Log</button>
+            <button class="btn btn-primary" onclick="exportExcel()">Export Excel</button>
+            <button class="btn btn-ghost" onclick="clearLog()">Clear</button>
+          </div>
+        </div>
+
+        <div class="status-strip" style="margin-top:0; margin-bottom:10px; border-top:none; padding-top:0;">
+          <div class="strip-item">
+            <span>Samples</span>
+            <strong id="logCount">0</strong>
+          </div>
+          <div class="strip-item">
+            <span>Interval</span>
+            <strong id="logIntervalDisp">1 s</strong>
+          </div>
+          <div class="strip-item">
+            <span>Duration</span>
+            <strong id="logDuration">00:00</strong>
+          </div>
+        </div>
+
+        <div class="table-wrap" style="max-height:300px; overflow-y:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Set</th>
+                <th>Int (°C)</th>
+                <th>Ext (°C)</th>
+                <th>ΔT</th>
+                <th>Pwr</th>
+                <th>Stab</th>
+              </tr>
+            </thead>
+            <tbody id="logTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- TAB 4: DUAL 19-POINT CALIBRATION (PIN LOCKED: 1234)                 -->
+    <!-- =================================================================== -->
+    <div class="window" id="win3">
+      <div class="card" id="calLockView">
+        <div class="lock-box">
+          <div style="font-size:1.8rem;">🔒</div>
+          <div style="font-weight:700;">Calibration Offset Locked</div>
+          <div class="lock-form">
+            <input type="password" id="pinInputCal" inputmode="numeric" maxlength="8" placeholder="PIN" onkeydown="if(event.key==='Enter') unlockSection('cal')" />
+            <button class="btn btn-primary" onclick="unlockSection('cal')">Unlock</button>
+          </div>
+          <div class="lock-err" id="pinErrCal"></div>
+        </div>
+      </div>
+
+      <div class="card" id="calUnlockedView" style="display:none;">
+        <div class="card-header">
+          <span class="card-title">19-Point Calibration Tables (°C)</span>
+          <div class="row">
+            <button class="btn btn-ghost btn-sm" onclick="sendCmd('GETCAL')">Sync</button>
+            <button class="btn btn-primary btn-sm" onclick="saveAllCurrentCal()">Save All</button>
+            <button class="btn btn-disable btn-sm" onclick="clearCurrentOffsets()">Zero All</button>
+            <button class="btn btn-ghost btn-sm" onclick="lockSection('cal')">Lock</button>
+          </div>
+        </div>
+
+        <div class="pill-switch">
+          <button id="calTabInt" class="pill-btn active" onclick="switchCalProbe('int')">Internal Control Probe</button>
+          <button id="calTabExt" class="pill-btn" onclick="switchCalProbe('ext')">External Monitor Probe</button>
+        </div>
+
+        <div class="cal-grid" id="calGrid"></div>
+      </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- TAB 5: MULTI-ZONE PID SETTINGS (PIN LOCKED: 1234)                   -->
+    <!-- =================================================================== -->
+    <div class="window" id="win4">
+      <div class="card" id="pidLockView">
+        <div class="lock-box">
+          <div style="font-size:1.8rem;">🔒</div>
+          <div style="font-weight:700;">Zone PID Settings Locked</div>
+          <div class="lock-form">
+            <input type="password" id="pinInputPid" inputmode="numeric" maxlength="8" placeholder="PIN" onkeydown="if(event.key==='Enter') unlockSection('pid')" />
+            <button class="btn btn-primary" onclick="unlockSection('pid')">Unlock</button>
+          </div>
+          <div class="lock-err" id="pinErrPid"></div>
+        </div>
+      </div>
+
+      <div class="card" id="pidUnlockedView" style="display:none;">
+        <div class="card-header">
+          <span class="card-title">Multi-Zone PID Parameters</span>
+          <div class="row">
+            <button class="btn btn-ghost btn-sm" onclick="sendCmd('GETZONES')">Sync</button>
+            <button class="btn btn-warn btn-sm" onclick="resetDefaultPIDs()">Defaults</button>
+            <button class="btn btn-ghost btn-sm" onclick="lockSection('pid')">Lock</button>
+          </div>
+        </div>
+
+        <div class="zone-card">
+          <div class="zone-head">
+            <span class="zone-name">Zone 0 — Cold (&lt; 15 °C)</span>
+            <span style="font-size:0.76rem; color:var(--muted);">Default: 10.9 / 0.135 / 58.0</span>
+          </div>
+          <div class="zone-inputs">
+            <div><label class="field-lbl">Kp</label><input type="number" step="0.1" id="z0_kp" value="10.9" /></div>
+            <div><label class="field-lbl">Ki</label><input type="number" step="0.005" id="z0_ki" value="0.135" /></div>
+            <div><label class="field-lbl">Kd</label><input type="number" step="0.5" id="z0_kd" value="58.0" /></div>
+            <button class="btn btn-primary" onclick="saveZonePID(0)">Save</button>
+          </div>
+        </div>
+
+        <div class="zone-card">
+          <div class="zone-head">
+            <span class="zone-name">Zone 1 — Mid (15 °C – 80 °C)</span>
+            <span style="font-size:0.76rem; color:var(--muted);">Default: 10.9 / 0.135 / 58.0</span>
+          </div>
+          <div class="zone-inputs">
+            <div><label class="field-lbl">Kp</label><input type="number" step="0.1" id="z1_kp" value="10.9" /></div>
+            <div><label class="field-lbl">Ki</label><input type="number" step="0.005" id="z1_ki" value="0.135" /></div>
+            <div><label class="field-lbl">Kd</label><input type="number" step="0.5" id="z1_kd" value="58.0" /></div>
+            <button class="btn btn-primary" onclick="saveZonePID(1)">Save</button>
+          </div>
+        </div>
+
+        <div class="zone-card" style="margin-bottom:0;">
+          <div class="zone-head">
+            <span class="zone-name">Zone 2 — Hot (&gt; 80 °C)</span>
+            <span style="font-size:0.76rem; color:var(--muted);">Default: 10.5 / 0.280 / 60.0</span>
+          </div>
+          <div class="zone-inputs">
+            <div><label class="field-lbl">Kp</label><input type="number" step="0.1" id="z2_kp" value="10.5" /></div>
+            <div><label class="field-lbl">Ki</label><input type="number" step="0.005" id="z2_ki" value="0.280" /></div>
+            <div><label class="field-lbl">Kd</label><input type="number" step="0.5" id="z2_kd" value="60.0" /></div>
+            <button class="btn btn-primary" onclick="saveZonePID(2)">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
-  <div class="row">
-    <span id="connStatusText" style="font-size:0.78rem; color:var(--muted);">Offline</span>
-    <button id="btnConnect" class="sm" onclick="toggleBLE()">Connect</button>
-  </div>
-</header>
 
-<nav class="tabs">
-  <button class="active" onclick="switchTab(0, this)">
-    <span class="tab-ico">&#127777;</span><span>Control</span>
-  </button>
-  <button onclick="switchTab(1, this)">
-    <span class="tab-ico">&#9654;</span><span>Profile</span>
-  </button>
-  <button onclick="switchTab(2, this)">
-    <span class="tab-ico">&#128202;</span><span>Log</span>
-  </button>
-  <button onclick="switchTab(3, this)">
-    <span class="tab-ico">&#9878;</span><span>Cal</span>
-  </button>
-  <button onclick="switchTab(4, this)">
-    <span class="tab-ico">&#9881;</span><span>PID</span>
-  </button>
-</nav>
+  <script>
+    const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+    const RX_UUID      = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
+    const TX_UUID      = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
+    const ACCESS_PIN   = "1234";
 
-<main>
-  <div id="watchdogBanner" class="banner-warn">
-    Telemetry stalled (&gt;3.5s) — attempting keep-alive sync...
-  </div>
+    const CAL_TEMPS = [-30, -20, -10, 0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150];
+    let intCalOffsets = new Array(19).fill(0.0);
+    let extCalOffsets = new Array(19).fill(0.0);
+    let activeCalProbe = "int";
 
-  <!-- TAB 0: DUAL-PROBE CONTROL & LIVE CHART -->
-  <div id="tab0" class="tab-pane active">
-    <div class="grid-2">
-      <!-- Internal Control Probe Card -->
-      <div class="card pv-box">
-        <div class="pv-header">
-          <span class="pv-label">Drywell Block (Control)</span>
-          <span id="stabilityBadge" class="badge settling">Settling</span>
-        </div>
-        <div id="pvDisplay" class="pv-value">--.-- °C</div>
-        <div id="faultWrap" style="margin-bottom:4px;">
-          <span id="faultBadge" class="badge fault" style="display:none;">FAULT</span>
-        </div>
-        <div class="sub-metrics">
-          <div><span>Setpoint</span><strong id="spDisplay">--.-- °C</strong></div>
-          <div><span>Raw RTD</span><strong id="rawDisplay">--.-- °C</strong></div>
-          <div><span>Power</span><strong id="pwmDisplay">0.0%</strong></div>
-        </div>
-        <div class="pwm-bar-wrap">
-          <div id="pwmBar" class="pwm-bar-fill"></div>
-        </div>
-      </div>
+    let bleDevice = null;
+    let rxChar = null;
+    let txChar = null;
+    let rxBuffer = "";
+    let writeQueue = Promise.resolve();
+    let userDisconnected = false;
 
-      <!-- External Monitor Probe Card (Monitor Only) -->
-      <div class="card pv-box">
-        <div class="pv-header">
-          <span class="pv-label">External Probe</span>
-          <span id="extStatusBadge" class="badge monitor">Monitor Only</span>
-        </div>
-        <div id="extPvDisplay" class="pv-value ext offline">Not Connected</div>
-        <div style="font-size:0.78rem; color:var(--muted); margin-bottom:4px;">
-          Independent readout &amp; log (does not control block)
-        </div>
-        <div class="sub-metrics">
-          <div><span>Raw Ext RTD</span><strong id="extRawDisplay">--.-- °C</strong></div>
-          <div><span>Delta (Ext−Blk)</span><strong id="extDeltaDisplay">--.-- °C</strong></div>
-          <div><span>Stability (Blk)</span><strong id="stabValDisplay">±--.-- °C</strong></div>
-        </div>
-      </div>
-    </div>
+    let wakeLock = null;
+    let audioCtx = null;
+    let lastPacketTs = 0;
 
-    <!-- Setpoint & Output Controls -->
-    <div class="card">
-      <div class="pv-label" style="margin-bottom:10px;">Setpoint &amp; Output Control</div>
-      <div class="sp-controls">
-        <input id="spInput" type="number" step="0.01" min="-30" max="150" value="25.00" />
-        <button onclick="applySetpoint()">Set °C</button>
-        <button id="btnRun" class="success" onclick="toggleRun()">Start</button>
-      </div>
-      <button id="btnClearFault" class="secondary" style="display:none; width:100%; margin-top:8px;" onclick="sendBLE('RSTFAULT')">
-        Clear Control Fault
-      </button>
-      <div class="preset-bar">
-        <button class="secondary sm" onclick="quickSet(-20)">-20 °C</button>
-        <button class="secondary sm" onclick="quickSet(0)">0 °C</button>
-        <button class="secondary sm" onclick="quickSet(25)">25 °C</button>
-        <button class="secondary sm" onclick="quickSet(50)">50 °C</button>
-        <button class="secondary sm" onclick="quickSet(100)">100 °C</button>
-        <button class="secondary sm" onclick="quickSet(140)">140 °C</button>
-      </div>
-    </div>
+    const live = {
+      t: 25.000, r: 25.000, s: 25.000, p: 0.0,
+      en: false, f: 0, z: 1, st: 0.000, ok: false,
+      et: 0.000, er: 0.000, eok: false
+    };
 
-    <!-- Live Dual-Probe Chart -->
-    <div class="card">
-      <div class="row-between" style="margin-bottom:8px;">
-        <span class="pv-label">Live Trend (0.01 °C)</span>
-        <div class="row">
-          <label style="font-size:0.8rem; color:var(--muted); display:flex; align-items:center; gap:4px;">
-            <input id="chkShowExtChart" type="checkbox" checked onchange="drawChart()" /> Show Ext
-          </label>
-          <button class="secondary sm" onclick="clearChart()">Clear</button>
-        </div>
-      </div>
-      <canvas id="tempChart" width="880" height="220"></canvas>
-      <div class="legend">
-        <span><i class="swatch" style="background:#38bdf8;"></i>Drywell Block</span>
-        <span><i class="swatch" style="background:#f59e0b;"></i>Setpoint</span>
-        <span><i class="swatch" style="background:#22c55e;"></i>External Probe</span>
-      </div>
-    </div>
-  </div>
+    // =========================================================================
+    // KEEP-ALIVE (WAKE LOCK + SILENT AUDIO) & 3.5s WATCHDOG
+    // =========================================================================
+    async function enableKeepAlive() {
+      try {
+        if ("wakeLock" in navigator && !wakeLock) {
+          wakeLock = await navigator.wakeLock.request("screen");
+          wakeLock.addEventListener("release", () => { wakeLock = null; });
+        }
+      } catch (_) {}
 
-  <!-- TAB 1: AUTOMATED MULTI-STEP PROFILE -->
-  <div id="tab1" class="tab-pane">
-    <div class="card">
-      <div class="row-between" style="margin-bottom:10px;">
-        <div>
-          <strong>Automated Step Profiler</strong>
-          <div id="profileStatus" style="font-size:0.84rem; color:var(--muted);">Idle</div>
-        </div>
-        <div class="row">
-          <button class="secondary sm" onclick="addProfileRow(25.00, 5)">+ Step</button>
-          <button id="btnProfileRun" class="success sm" onclick="toggleProfile()">Start</button>
-        </div>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Target (°C)</th>
-              <th>Soak (min)</th>
-              <th>Wait Stable</th>
-              <th>Del</th>
-            </tr>
-          </thead>
-          <tbody id="profileBody"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <!-- TAB 2: DATA LOGGING (SELECTABLE INTERVAL + BOTH PROBES) -->
-  <div id="tab2" class="tab-pane">
-    <div class="card">
-      <div class="row-between" style="margin-bottom:10px;">
-        <div>
-          <strong>Dual-Probe Data Logger</strong>
-          <div id="logCount" style="font-size:0.82rem; color:var(--muted);">0 rows logged</div>
-        </div>
-        <div class="row">
-          <button id="btnLogToggle" class="success sm" onclick="toggleLogging()">Start Log</button>
-          <button class="secondary sm" onclick="exportExcel()">Export .xlsx</button>
-          <button class="danger sm" onclick="clearLogs()">Clear</button>
-        </div>
-      </div>
-
-      <!-- Selectable Timing Interval -->
-      <div class="row" style="margin-bottom:12px; padding:10px; background:var(--card-alt); border-radius:10px;">
-        <label for="logIntervalSelect" style="font-size:0.86rem; font-weight:600;">Log Interval:</label>
-        <select id="logIntervalSelect" onchange="onIntervalChange()">
-          <option value="1000">Every 1 sec</option>
-          <option value="2000">Every 2 sec</option>
-          <option value="5000" selected>Every 5 sec</option>
-          <option value="10000">Every 10 sec</option>
-          <option value="30000">Every 30 sec</option>
-          <option value="60000">Every 60 sec</option>
-          <option value="300000">Every 5 min</option>
-          <option value="custom">Custom (sec)</option>
-        </select>
-        <input id="customIntervalSec" type="number" min="1" max="86400" value="15"
-               style="display:none; width:96px;" onchange="onIntervalChange()" />
-        <span id="nextLogHint" style="font-size:0.8rem; color:var(--muted);">Active interval: 5s</span>
-      </div>
-
-      <div class="table-wrap" style="max-height:380px; overflow-y:auto;">
-        <table>
-          <thead>
-            <tr>
-              <th>Time</th>
-              <th>Block (°C)</th>
-              <th>Setpoint (°C)</th>
-              <th>Ext Probe (°C)</th>
-              <th>Delta (°C)</th>
-              <th>PWM %</th>
-            </tr>
-          </thead>
-          <tbody id="logTableBody"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <!-- TAB 3: DUAL 19-POINT CALIBRATION (PIN LOCKED) -->
-  <div id="tab3" class="tab-pane">
-    <div id="calPinGate" class="card pin-overlay">
-      <div style="margin-bottom:12px; font-weight:600;">Enter PIN to Unlock Calibration</div>
-      <div class="row" style="justify-content:center;">
-        <input id="calPinInput" type="password" inputmode="numeric" maxlength="8" placeholder="PIN" style="width:140px;" />
-        <button onclick="unlockPin('cal')">Unlock</button>
-      </div>
-    </div>
-
-    <div id="calContent" class="card" style="display:none;">
-      <div class="seg-toggle">
-        <button id="btnCalInt" class="active" onclick="selectCalTarget('int')">Internal Block Probe</button>
-        <button id="btnCalExt" onclick="selectCalTarget('ext')">External Monitor Probe</button>
-      </div>
-
-      <div class="row-between" style="margin-bottom:10px;">
-        <strong id="calTitle">Internal Block 19-Point Offsets (0.01 °C)</strong>
-        <div class="row">
-          <button class="secondary sm" onclick="sendBLE('GETCFG')">Sync ESP32</button>
-          <button class="sm" onclick="saveAllCal()">Save All</button>
-        </div>
-      </div>
-
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Reference (°C)</th>
-              <th>Offset (°C)</th>
-              <th>Save</th>
-            </tr>
-          </thead>
-          <tbody id="calTableBody"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <!-- TAB 4: ZONE PID TUNING (PIN LOCKED) -->
-  <div id="tab4" class="tab-pane">
-    <div id="pidPinGate" class="card pin-overlay">
-      <div style="margin-bottom:12px; font-weight:600;">Enter PIN to Unlock Multi-Zone PID</div>
-      <div class="row" style="justify-content:center;">
-        <input id="pidPinInput" type="password" inputmode="numeric" maxlength="8" placeholder="PIN" style="width:140px;" />
-        <button onclick="unlockPin('pid')">Unlock</button>
-      </div>
-    </div>
-    <div id="pidContent" class="card" style="display:none;">
-      <div class="row-between" style="margin-bottom:10px;">
-        <strong>Scheduled Zone PID (Internal Control)</strong>
-        <button class="secondary sm" onclick="sendBLE('GETCFG')">Sync ESP32</button>
-      </div>
-      <div id="zoneCards"></div>
-    </div>
-  </div>
-</main>
-
-<script>
-  // ==========================================================================
-  // BLE & KEEP-ALIVE CONFIGURATION
-  // ==========================================================================
-  const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
-  const RX_UUID      = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
-  const TX_UUID      = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
-  const ACCESS_PIN   = "1234";
-
-  let bleDevice = null;
-  let rxChar = null;
-  let txChar = null;
-  let rxLineBuf = "";
-  let writeQueue = Promise.resolve();
-
-  let wakeLock = null;
-  let audioCtx = null;
-  let lastPacketTs = 0;
-
-  // Live Telemetry State (Internal Control + External Monitor)
-  const state = {
-    pv: 25.00,
-    sp: 25.00,
-    raw: 25.00,
-    pwm: 0.0,
-    stab: 0.00,
-    isStable: false,
-    running: false,
-    fault: 0,
-    extPv: 0.00,
-    extRaw: 0.00,
-    extValid: false
-  };
-
-  // Live Chart History
-  const chartData = [];
-  const MAX_CHART_POINTS = 360;
-
-  // Step Profile State
-  let profileSteps = [
-    { target: 0.00, soakMin: 5, waitStable: true },
-    { target: 25.00, soakMin: 5, waitStable: true },
-    { target: 50.00, soakMin: 5, waitStable: true },
-    { target: 100.00, soakMin: 5, waitStable: true }
-  ];
-  let profileRunning = false;
-  let profileIndex = 0;
-  let soakStartTs = null;
-
-  // Data Logger State (with Selectable Timing Interval)
-  let isLogging = false;
-  let logIntervalMs = 5000;
-  let lastLogTs = 0;
-  let logRows = [];
-
-  // Dual 19-Point Calibration Tables
-  const calPoints = [
-    -30, -20, -10, 0, 10, 20, 30, 40, 50,
-     60,  70,  80, 90, 100, 110, 120, 130, 140, 150
-  ];
-  const intCalOffsets = new Array(19).fill(0.00);
-  const extCalOffsets = new Array(19).fill(0.00);
-  let activeCalTarget = "int";
-
-  // Zone PID Defaults
-  const zoneConfigs = [
-    { name: "Zone 0 (< 10.00 °C Cooling)", kp: 10.9, ki: 0.135, kd: 58.0 },
-    { name: "Zone 1 (10.00 – 60.00 °C Mid)", kp: 10.9, ki: 0.135, kd: 58.0 },
-    { name: "Zone 2 (> 60.00 °C High)", kp: 12.5, ki: 0.160, kd: 65.0 }
-  ];
-
-  // ==========================================================================
-  // ANTI-FREEZE: SCREEN WAKE LOCK & SILENT WEB AUDIO KEEP-ALIVE
-  // ==========================================================================
-  async function enableKeepAlive() {
-    try {
-      if ("wakeLock" in navigator && !wakeLock) {
-        wakeLock = await navigator.wakeLock.request("screen");
-        wakeLock.addEventListener("release", () => { wakeLock = null; });
-      }
-    } catch (_) {}
-
-    try {
-      if (!audioCtx) {
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        audioCtx = new AudioContext();
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        gain.gain.value = 0.0001;
-        osc.frequency.value = 20;
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start();
-      } else if (audioCtx.state === "suspended") {
-        await audioCtx.resume();
-      }
-    } catch (_) {}
-  }
-
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible" && bleDevice && bleDevice.gatt.connected) {
-      enableKeepAlive();
+      try {
+        if (!audioCtx) {
+          const AC = window.AudioContext || window.webkitAudioContext;
+          audioCtx = new AC();
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          gain.gain.value = 0.0001;
+          osc.frequency.value = 20;
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start();
+        } else if (audioCtx.state === "suspended") {
+          await audioCtx.resume();
+        }
+      } catch (_) {}
     }
-  });
 
-  // 3.5-Second Telemetry Watchdog
-  setInterval(() => {
-    const banner = document.getElementById("watchdogBanner");
-    const dot = document.getElementById("connDot");
-    if (bleDevice && bleDevice.gatt.connected && lastPacketTs > 0) {
-      if (Date.now() - lastPacketTs > 3500) {
-        banner.style.display = "block";
-        dot.className = "dot stale";
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible" && bleDevice && bleDevice.gatt.connected) {
+        enableKeepAlive();
+      }
+    });
+
+    setInterval(() => {
+      const banner = document.getElementById("watchdogBanner");
+      const dot = document.getElementById("connDot");
+      if (bleDevice && bleDevice.gatt.connected && lastPacketTs > 0) {
+        if (Date.now() - lastPacketTs > 3500) {
+          banner.style.display = "block";
+          dot.className = "dot stale";
+        } else {
+          banner.style.display = "none";
+          dot.className = "dot connected";
+        }
       } else {
         banner.style.display = "none";
-        dot.className = "dot connected";
       }
-    } else {
-      banner.style.display = "none";
-    }
-  }, 1000);
+    }, 1000);
 
-  // ==========================================================================
-  // WEB BLUETOOTH CONNECTION & NON-BLOCKING WRITE QUEUE
-  // ==========================================================================
-  async function toggleBLE() {
-    if (bleDevice && bleDevice.gatt.connected) {
-      bleDevice.gatt.disconnect();
-      return;
+    // =========================================================================
+    // NAVIGATION & PIN LOCK
+    // =========================================================================
+    function switchWindow(idx) {
+      for (let i = 0; i < 5; i++) {
+        document.getElementById("win" + i).classList.toggle("active", i === idx);
+        document.getElementById("tab" + i).classList.toggle("active", i === idx);
+      }
     }
-    try {
-      await enableKeepAlive();
-      bleDevice = await navigator.bluetooth.requestDevice({
-        acceptAllDevices: true,
-        optionalServices: [SERVICE_UUID]
-      });
-      bleDevice.addEventListener("gattserverdisconnected", onBLEDisconnected);
 
+    function unlockSection(sec) {
+      const isCal = sec === "cal";
+      const inp = document.getElementById(isCal ? "pinInputCal" : "pinInputPid");
+      const err = document.getElementById(isCal ? "pinErrCal" : "pinErrPid");
+      if (inp.value === ACCESS_PIN) {
+        err.textContent = "";
+        inp.value = "";
+        document.getElementById(isCal ? "calLockView" : "pidLockView").style.display = "none";
+        document.getElementById(isCal ? "calUnlockedView" : "pidUnlockedView").style.display = "block";
+        sendCmd("GETCAL");
+      } else {
+        err.textContent = "Incorrect PIN";
+        inp.value = "";
+      }
+    }
+
+    function lockSection(sec) {
+      const isCal = sec === "cal";
+      document.getElementById(isCal ? "calUnlockedView" : "pidUnlockedView").style.display = "none";
+      document.getElementById(isCal ? "calLockView" : "pidLockView").style.display = "block";
+    }
+
+    // =========================================================================
+    // DUAL-PROBE CHART.JS
+    // =========================================================================
+    const ctx = document.getElementById("tempChart").getContext("2d");
+    const tempChart = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: [],
+        datasets: [
+          { label: "Internal (°C)", data: [], borderColor: "#38bdf8", borderWidth: 2, pointRadius: 0, tension: 0.15 },
+          { label: "External (°C)", data: [], borderColor: "#a78bfa", borderWidth: 2, pointRadius: 0, tension: 0.15 },
+          { label: "Setpoint (°C)", data: [], borderColor: "#10b981", borderWidth: 1.5, borderDash: [5, 5], pointRadius: 0 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        scales: {
+          x: { ticks: { color: "#64748b", maxTicksLimit: 6 }, grid: { color: "#1e293b" } },
+          y: { ticks: { color: "#94a3b8" }, grid: { color: "#1e293b" } }
+        },
+        plugins: { legend: { labels: { color: "#cbd5e1", boxWidth: 14, font: { size: 11 } } } }
+      }
+    });
+
+    function clearChart() {
+      tempChart.data.labels = [];
+      tempChart.data.datasets.forEach(ds => ds.data = []);
+      tempChart.update();
+    }
+
+    // =========================================================================
+    // WEB BLUETOOTH CONNECTION, PACED WRITE QUEUE & AUTO-RECONNECT
+    // =========================================================================
+    async function toggleBLE() {
+      if (bleDevice && bleDevice.gatt.connected) {
+        userDisconnected = true;
+        bleDevice.gatt.disconnect();
+        return;
+      }
+      try {
+        await enableKeepAlive();
+        userDisconnected = false;
+        if (!bleDevice) {
+          bleDevice = await navigator.bluetooth.requestDevice({
+            filters: [{ namePrefix: "Drywell" }],
+            optionalServices: [SERVICE_UUID]
+          });
+          bleDevice.addEventListener("gattserverdisconnected", onDisconnected);
+        }
+        await establishGatt();
+      } catch (err) {
+        console.warn("BLE connect:", err?.message || err);
+      }
+    }
+
+    async function establishGatt() {
       const server = await bleDevice.gatt.connect();
       const service = await server.getPrimaryService(SERVICE_UUID);
       rxChar = await service.getCharacteristic(RX_UUID);
       txChar = await service.getCharacteristic(TX_UUID);
-
       await txChar.startNotifications();
-      txChar.addEventListener("characteristicvaluechanged", onBLENotification);
+      txChar.addEventListener("characteristicvaluechanged", handleNotification);
 
       lastPacketTs = Date.now();
       document.getElementById("connDot").className = "dot connected";
-      document.getElementById("connStatusText").textContent = "Connected";
+      const badge = document.getElementById("connBadge");
+      badge.textContent = "Connected";
+      badge.className = "badge connected";
       document.getElementById("btnConnect").textContent = "Disconnect";
 
-      setTimeout(() => sendBLE("GETCFG"), 300);
-    } catch (err) {
-      console.error("BLE Error:", err);
+      setTimeout(() => sendCmd("GETCAL"), 300);
     }
-  }
 
-  function onBLEDisconnected() {
-    document.getElementById("connDot").className = "dot";
-    document.getElementById("connStatusText").textContent = "Offline";
-    document.getElementById("btnConnect").textContent = "Connect";
-    rxChar = null;
-    txChar = null;
-  }
+    function onDisconnected() {
+      rxChar = null;
+      txChar = null;
+      document.getElementById("connDot").className = "dot";
+      const badge = document.getElementById("connBadge");
+      badge.className = "badge";
+      if (!userDisconnected && bleDevice) {
+        badge.textContent = "Reconnecting...";
+        setTimeout(async () => {
+          if (userDisconnected || !bleDevice) return;
+          try { await establishGatt(); } catch (_) { onDisconnected(); }
+        }, 3000);
+      } else {
+        badge.textContent = "Disconnected";
+        document.getElementById("btnConnect").textContent = "Connect";
+      }
+    }
 
-  function sendBLE(cmd) {
-    if (!rxChar) return;
-    const data = new TextEncoder().encode(cmd + "\n");
-    writeQueue = writeQueue.then(async () => {
+    function sendCmd(cmd) {
       if (!rxChar) return;
-      if (rxChar.writeValueWithoutResponse) {
-        await rxChar.writeValueWithoutResponse(data);
-      } else {
-        await rxChar.writeValue(data);
-      }
-    }).catch(err => console.warn("BLE Write:", err));
-  }
-
-  function onBLENotification(event) {
-    const chunk = new TextDecoder().decode(event.target.value);
-    rxLineBuf += chunk;
-    let idx;
-    while ((idx = rxLineBuf.indexOf("\n")) >= 0) {
-      const line = rxLineBuf.slice(0, idx).trim();
-      rxLineBuf = rxLineBuf.slice(idx + 1);
-      if (line) handleTelemetryLine(line);
-    }
-  }
-
-  function handleTelemetryLine(line) {
-    lastPacketTs = Date.now();
-    const parts = line.split(",");
-
-    if (parts[0] === "DATA" && parts.length >= 9) {
-      state.pv = parseFloat(parts[1]);
-      state.sp = parseFloat(parts[2]);
-      state.raw = parseFloat(parts[3]);
-      state.pwm = parseFloat(parts[4]);
-      state.stab = parseFloat(parts[5]);
-      state.isStable = parts[6] === "1";
-      state.running = parts[7] === "1";
-      state.fault = parseInt(parts[8], 10);
-
-      if (parts.length >= 12) {
-        state.extPv = parseFloat(parts[9]);
-        state.extRaw = parseFloat(parts[10]);
-        state.extValid = parts[11] === "1";
-      } else {
-        state.extValid = false;
-      }
-
-      updateLiveUI();
-      pushChartPoint(state.pv, state.sp, state.extValid ? state.extPv : null);
-      stepProfileEngine();
-      recordLogIfActive();
-    } else if (parts[0] === "ZCFG" && parts.length >= 5) {
-      const z = parseInt(parts[1], 10);
-      if (z >= 0 && z <= 2) {
-        zoneConfigs[z].kp = parseFloat(parts[2]);
-        zoneConfigs[z].ki = parseFloat(parts[3]);
-        zoneConfigs[z].kd = parseFloat(parts[4]);
-        renderZoneCards();
-      }
-    } else if (parts[0] === "CCFG" && parts.length >= 4) {
-      const i = parseInt(parts[1], 10);
-      if (i >= 0 && i < 19) {
-        intCalOffsets[i] = parseFloat(parts[3]);
-        if (activeCalTarget === "int") renderCalTable();
-      }
-    } else if (parts[0] === "ECFG" && parts.length >= 4) {
-      const i = parseInt(parts[1], 10);
-      if (i >= 0 && i < 19) {
-        extCalOffsets[i] = parseFloat(parts[3]);
-        if (activeCalTarget === "ext") renderCalTable();
-      }
-    }
-  }
-
-  // ==========================================================================
-  // LIVE UI UPDATES (0.01 °C DISPLAY RESOLUTION)
-  // ==========================================================================
-  function updateLiveUI() {
-    // Internal Control Probe
-    document.getElementById("pvDisplay").textContent = `${state.pv.toFixed(2)} °C`;
-    document.getElementById("spDisplay").textContent = `${state.sp.toFixed(2)} °C`;
-    document.getElementById("rawDisplay").textContent = `${state.raw.toFixed(2)} °C`;
-    document.getElementById("pwmDisplay").textContent = `${state.pwm.toFixed(1)}%`;
-    document.getElementById("stabValDisplay").textContent = `±${state.stab.toFixed(2)} °C`;
-
-    const stabBadge = document.getElementById("stabilityBadge");
-    stabBadge.className = state.isStable ? "badge stable" : "badge settling";
-    stabBadge.textContent = state.isStable ? "Stable" : "Settling";
-
-    // External Monitor Probe
-    const extPvEl = document.getElementById("extPvDisplay");
-    const extBadge = document.getElementById("extStatusBadge");
-    if (state.extValid) {
-      const delta = state.extPv - state.pv;
-      extPvEl.textContent = `${state.extPv.toFixed(2)} °C`;
-      extPvEl.className = "pv-value ext";
-      extBadge.className = "badge stable";
-      extBadge.textContent = "Monitor Active";
-      document.getElementById("extRawDisplay").textContent = `${state.extRaw.toFixed(2)} °C`;
-      document.getElementById("extDeltaDisplay").textContent = `${delta >= 0 ? "+" : ""}${delta.toFixed(2)} °C`;
-    } else {
-      extPvEl.textContent = "Not Connected";
-      extPvEl.className = "pv-value ext offline";
-      extBadge.className = "badge monitor";
-      extBadge.textContent = "Monitor Only";
-      document.getElementById("extRawDisplay").textContent = "--.-- °C";
-      document.getElementById("extDeltaDisplay").textContent = "--.-- °C";
-    }
-
-    // Control Fault & Output Bar
-    const faultBadge = document.getElementById("faultBadge");
-    const btnClear = document.getElementById("btnClearFault");
-    if (state.fault !== 0) {
-      faultBadge.style.display = "inline-block";
-      faultBadge.textContent = `CONTROL FAULT ${state.fault}`;
-      btnClear.style.display = "block";
-    } else {
-      faultBadge.style.display = "none";
-      btnClear.style.display = "none";
-    }
-
-    const bar = document.getElementById("pwmBar");
-    bar.style.width = `${Math.min(100, Math.abs(state.pwm))}%`;
-    bar.style.background = state.pwm >= 0 ? "#f59e0b" : "#38bdf8";
-
-    const btnRun = document.getElementById("btnRun");
-    btnRun.textContent = state.running ? "Stop" : "Start";
-    btnRun.className = state.running ? "danger" : "success";
-  }
-
-  function applySetpoint() {
-    const val = parseFloat(document.getElementById("spInput").value);
-    if (!isNaN(val) && val >= -30 && val <= 150) {
-      sendBLE(`SET:${val.toFixed(3)}`);
-    }
-  }
-
-  function quickSet(val) {
-    document.getElementById("spInput").value = val.toFixed(2);
-    sendBLE(`SET:${val.toFixed(3)}`);
-  }
-
-  function toggleRun() {
-    sendBLE(state.running ? "RUN:0" : "RUN:1");
-  }
-
-  // ==========================================================================
-  // LIVE DUAL-PROBE CHART (0.01 °C)
-  // ==========================================================================
-  function pushChartPoint(pv, sp, extPv) {
-    chartData.push({ pv, sp, extPv });
-    if (chartData.length > MAX_CHART_POINTS) chartData.shift();
-    drawChart();
-  }
-
-  function clearChart() {
-    chartData.length = 0;
-    drawChart();
-  }
-
-  function drawChart() {
-    const canvas = document.getElementById("tempChart");
-    const ctx = canvas.getContext("2d");
-    const w = canvas.width;
-    const h = canvas.height;
-    ctx.clearRect(0, 0, w, h);
-
-    if (chartData.length < 2) return;
-    const showExt = document.getElementById("chkShowExtChart").checked;
-
-    let minV = Infinity, maxV = -Infinity;
-    for (const d of chartData) {
-      minV = Math.min(minV, d.pv, d.sp);
-      maxV = Math.max(maxV, d.pv, d.sp);
-      if (showExt && d.extPv !== null) {
-        minV = Math.min(minV, d.extPv);
-        maxV = Math.max(maxV, d.extPv);
-      }
-    }
-    if (maxV - minV < 0.10) {
-      const mid = (maxV + minV) / 2;
-      minV = mid - 0.05;
-      maxV = mid + 0.05;
-    }
-
-    const padL = 62, padR = 14, padT = 16, padB = 22;
-    const plotW = w - padL - padR;
-    const plotH = h - padT - padB;
-
-    ctx.strokeStyle = "#1e293b";
-    ctx.fillStyle = "#94a3b8";
-    ctx.font = "12px sans-serif";
-    for (let g = 0; g <= 4; g++) {
-      const frac = g / 4;
-      const y = padT + frac * plotH;
-      const val = maxV - frac * (maxV - minV);
-      ctx.beginPath();
-      ctx.moveTo(padL, y);
-      ctx.lineTo(w - padR, y);
-      ctx.stroke();
-      ctx.fillText(val.toFixed(2), 6, y + 4);
-    }
-
-    const mapX = (i) => padL + (i / (chartData.length - 1)) * plotW;
-    const mapY = (v) => padT + ((maxV - v) / (maxV - minV)) * plotH;
-
-    // Setpoint (dashed amber)
-    ctx.strokeStyle = "#f59e0b";
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([5, 4]);
-    ctx.beginPath();
-    chartData.forEach((d, i) => {
-      const x = mapX(i), y = mapY(d.sp);
-      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-    });
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Internal Block PV (cyan)
-    ctx.strokeStyle = "#38bdf8";
-    ctx.lineWidth = 2.2;
-    ctx.beginPath();
-    chartData.forEach((d, i) => {
-      const x = mapX(i), y = mapY(d.pv);
-      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-    });
-    ctx.stroke();
-
-    // External Monitor Probe PV (green)
-    if (showExt) {
-      ctx.strokeStyle = "#22c55e";
-      ctx.lineWidth = 2.0;
-      ctx.beginPath();
-      let started = false;
-      chartData.forEach((d, i) => {
-        if (d.extPv === null) {
-          started = false;
-          return;
-        }
-        const x = mapX(i), y = mapY(d.extPv);
-        if (!started) { ctx.moveTo(x, y); started = true; }
-        else ctx.lineTo(x, y);
-      });
-      ctx.stroke();
-    }
-  }
-
-  // ==========================================================================
-  // AUTOMATED STEP PROFILER
-  // ==========================================================================
-  function renderProfileTable() {
-    const tbody = document.getElementById("profileBody");
-    tbody.innerHTML = "";
-    profileSteps.forEach((step, idx) => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${idx + 1}</td>
-        <td><input type="number" step="0.01" min="-30" max="150" value="${step.target.toFixed(2)}" style="width:94px;"
-            onchange="profileSteps[${idx}].target = parseFloat(this.value) || 0" /></td>
-        <td><input type="number" step="1" min="0" max="600" value="${step.soakMin}" style="width:76px;"
-            onchange="profileSteps[${idx}].soakMin = parseInt(this.value, 10) || 0" /></td>
-        <td><input type="checkbox" style="width:20px; height:20px;" ${step.waitStable ? "checked" : ""}
-            onchange="profileSteps[${idx}].waitStable = this.checked" /></td>
-        <td><button class="danger sm" onclick="removeProfileRow(${idx})">X</button></td>
-      `;
-      tbody.appendChild(tr);
-    });
-  }
-
-  function addProfileRow(target, soakMin) {
-    profileSteps.push({ target, soakMin, waitStable: true });
-    renderProfileTable();
-  }
-
-  function removeProfileRow(idx) {
-    profileSteps.splice(idx, 1);
-    renderProfileTable();
-  }
-
-  function toggleProfile() {
-    if (profileRunning) {
-      profileRunning = false;
-      soakStartTs = null;
-      document.getElementById("btnProfileRun").textContent = "Start";
-      document.getElementById("btnProfileRun").className = "success sm";
-      document.getElementById("profileStatus").textContent = "Stopped";
-      sendBLE("RUN:0");
-      return;
-    }
-    if (profileSteps.length === 0) return;
-    profileRunning = true;
-    profileIndex = 0;
-    soakStartTs = null;
-    document.getElementById("btnProfileRun").textContent = "Stop";
-    document.getElementById("btnProfileRun").className = "danger sm";
-
-    const first = profileSteps[0];
-    document.getElementById("spInput").value = first.target.toFixed(2);
-    sendBLE(`SET:${first.target.toFixed(3)}`);
-    sendBLE("RUN:1");
-  }
-
-  function stepProfileEngine() {
-    if (!profileRunning) return;
-    const step = profileSteps[profileIndex];
-    if (!step) {
-      toggleProfile();
-      document.getElementById("profileStatus").textContent = "Profile Complete";
-      return;
-    }
-
-    const statusEl = document.getElementById("profileStatus");
-    const withinBand = Math.abs(state.pv - step.target) <= 0.05;
-    const readyToSoak = step.waitStable ? (withinBand && state.isStable) : withinBand;
-
-    if (!soakStartTs) {
-      statusEl.textContent = `Step ${profileIndex + 1}/${profileSteps.length}: Ramping to ${step.target.toFixed(2)} °C`;
-      if (readyToSoak) soakStartTs = Date.now();
-    } else {
-      const elapsedSec = (Date.now() - soakStartTs) / 1000;
-      const remSec = Math.max(0, Math.ceil(step.soakMin * 60 - elapsedSec));
-      statusEl.textContent = `Step ${profileIndex + 1}/${profileSteps.length}: Soaking ${step.target.toFixed(2)} °C (${remSec}s left)`;
-
-      if (elapsedSec >= step.soakMin * 60) {
-        profileIndex++;
-        soakStartTs = null;
-        if (profileIndex < profileSteps.length) {
-          const next = profileSteps[profileIndex];
-          document.getElementById("spInput").value = next.target.toFixed(2);
-          sendBLE(`SET:${next.target.toFixed(3)}`);
+      const bytes = new TextEncoder().encode(cmd + "\n");
+      writeQueue = writeQueue.then(async () => {
+        if (!rxChar) return;
+        if (rxChar.writeValueWithResponse) {
+          await rxChar.writeValueWithResponse(bytes);
         } else {
-          toggleProfile();
-          statusEl.textContent = "Profile Complete";
+          await rxChar.writeValue(bytes);
+        }
+        await new Promise(r => setTimeout(r, 30));
+      }).catch(err => console.warn("BLE write:", err?.message || err));
+    }
+
+    function handleNotification(event) {
+      rxBuffer += new TextDecoder().decode(event.target.value);
+      const lines = rxBuffer.split("\n");
+      rxBuffer = lines.pop();
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        try {
+          const msg = JSON.parse(trimmed);
+          if (typeof msg.t === "number") {
+            lastPacketTs = Date.now();
+            live.t   = msg.t;
+            live.r   = msg.r;
+            live.s   = msg.s;
+            live.p   = msg.p;
+            live.en  = msg.en === 1;
+            live.f   = msg.f || 0;
+            live.z   = msg.z ?? 1;
+            live.st  = msg.st || 0;
+            live.ok  = msg.ok === 1;
+            live.et  = typeof msg.et === "number" ? msg.et : 0;
+            live.er  = typeof msg.er === "number" ? msg.er : 0;
+            live.eok = msg.eok === 1;
+            updateTelemetryUI();
+            tickProfiler();
+            tickLogger();
+          } else if (typeof msg.zcfg === "number") {
+            const z = msg.zcfg;
+            if (z >= 0 && z <= 2) {
+              const kpEl = document.getElementById(`z${z}_kp`);
+              const kiEl = document.getElementById(`z${z}_ki`);
+              const kdEl = document.getElementById(`z${z}_kd`);
+              if (kpEl && document.activeElement !== kpEl) kpEl.value = msg.kp;
+              if (kiEl && document.activeElement !== kiEl) kiEl.value = msg.ki;
+              if (kdEl && document.activeElement !== kdEl) kdEl.value = msg.kd;
+            }
+          } else if (typeof msg.ccfg === "number") {
+            if (msg.ccfg >= 0 && msg.ccfg < 19) {
+              intCalOffsets[msg.ccfg] = msg.off;
+              if (activeCalProbe === "int") updateCalInput(msg.ccfg, msg.off);
+            }
+          } else if (typeof msg.ecfg === "number") {
+            if (msg.ecfg >= 0 && msg.ecfg < 19) {
+              extCalOffsets[msg.ecfg] = msg.off;
+              if (activeCalProbe === "ext") updateCalInput(msg.ecfg, msg.off);
+            }
+          }
+        } catch (_) {}
+      }
+    }
+
+    function updateTelemetryUI() {
+      // Main probe readouts at 0.01°C resolution
+      document.getElementById("dispIntTemp").textContent = live.t.toFixed(2) + " °C";
+      document.getElementById("dispIntRaw").textContent  = "Raw: " + live.r.toFixed(3) + " °C";
+      document.getElementById("dispSet").textContent     = live.s.toFixed(2) + " °C";
+
+      const stabEl = document.getElementById("stabBadge");
+      if (live.ok) {
+        stabEl.className = "badge connected";
+        stabEl.textContent = `Stable (±${live.st.toFixed(3)})`;
+      } else {
+        stabEl.className = "badge warn";
+        stabEl.textContent = `Settling (±${live.st.toFixed(3)})`;
+      }
+
+      // External Monitor Probe Card
+      const extBadge = document.getElementById("extBadge");
+      if (live.eok) {
+        document.getElementById("dispExtTemp").textContent = live.et.toFixed(2) + " °C";
+        document.getElementById("dispExtRaw").textContent  = "Raw: " + live.er.toFixed(3) + " °C";
+        extBadge.className = "badge ext";
+        extBadge.textContent = "Monitor Active";
+        const delta = live.et - live.t;
+        document.getElementById("dispDelta").textContent = (delta >= 0 ? "+" : "") + delta.toFixed(2) + " °C";
+      } else {
+        document.getElementById("dispExtTemp").textContent = "--.-- °C";
+        document.getElementById("dispExtRaw").textContent  = "Raw: --.--- °C";
+        extBadge.className = "badge";
+        extBadge.textContent = "Not Connected";
+        document.getElementById("dispDelta").textContent = "--.-- °C";
+      }
+
+      document.getElementById("dispZoneState").textContent = `Z${live.z} • ${live.en ? "ACTIVE" : "OFF"}`;
+
+      const btn = document.getElementById("btnToggleOut");
+      btn.textContent = live.en ? "Stop" : "Start";
+      btn.className = live.en ? "btn btn-disable" : "btn btn-enable";
+
+      // Power bar (sketch reports -100.0% to +100.0%)
+      const pct = Math.min(100, Math.abs(live.p));
+      const bar = document.getElementById("powerBar");
+      const lbl = document.getElementById("dispPower");
+      bar.style.width = pct.toFixed(1) + "%";
+      if (live.p > 0.05) {
+        bar.style.background = "var(--heat)";
+        lbl.textContent = `${pct.toFixed(1)}% (HEATING)`;
+      } else if (live.p < -0.05) {
+        bar.style.background = "var(--cool)";
+        lbl.textContent = `${pct.toFixed(1)}% (COOLING)`;
+      } else {
+        bar.style.background = "var(--accent)";
+        lbl.textContent = "0.0% (IDLE)";
+      }
+
+      // Fault badge
+      const fb = document.getElementById("faultBadge");
+      const cf = document.getElementById("btnClearFault");
+      if (live.f !== 0) {
+        fb.style.display = "inline-block";
+        fb.textContent = "FAULT " + live.f;
+        cf.style.display = "block";
+      } else {
+        fb.style.display = "none";
+        cf.style.display = "none";
+      }
+
+      // Update Dual-Probe Chart
+      const nowStr = new Date().toLocaleTimeString([], { minute: "2-digit", second: "2-digit" });
+      tempChart.data.labels.push(nowStr);
+      tempChart.data.datasets[0].data.push(live.t);
+      tempChart.data.datasets[1].data.push(live.eok ? live.et : null);
+      tempChart.data.datasets[2].data.push(live.s);
+      if (tempChart.data.labels.length > 240) {
+        tempChart.data.labels.shift();
+        tempChart.data.datasets.forEach(ds => ds.data.shift());
+      }
+      tempChart.update();
+    }
+
+    function sendSetpoint() {
+      const val = parseFloat(document.getElementById("inputSet").value);
+      if (!isNaN(val) && val >= -30 && val <= 150) {
+        sendCmd("SET:" + val.toFixed(2));
+      }
+    }
+
+    function toggleOutput() {
+      sendCmd(live.en ? "EN:0" : "EN:1");
+    }
+
+    // =========================================================================
+    // AUTOMATED STEP PROFILER
+    // =========================================================================
+    let profileSteps = [
+      { target: 0.0, minutes: 10, waitStable: true },
+      { target: 50.0, minutes: 10, waitStable: true },
+      { target: 100.0, minutes: 10, waitStable: true }
+    ];
+    let profRunning = false;
+    let profIdx = 0;
+    let profPhase = "idle"; // ramp | soak
+    let profSoakStartTs = 0;
+
+    function renderProfileTable() {
+      const tb = document.getElementById("profTableBody");
+      tb.innerHTML = "";
+      profileSteps.forEach((st, i) => {
+        const activeMark = (profRunning && i === profIdx) ? " style='background:rgba(56,189,248,0.12);'" : "";
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td${activeMark}>${i + 1}</td>
+          <td${activeMark}><strong>${st.target.toFixed(2)} °C</strong></td>
+          <td${activeMark}>${st.minutes} min</td>
+          <td${activeMark}>${st.waitStable ? "Stable (±0.02)" : "Band (±0.10)"}</td>
+          <td${activeMark}>
+            <button class="btn btn-ghost btn-sm" onclick="removeProfileStep(${i})" ${profRunning ? "disabled" : ""}>✕</button>
+          </td>
+        `;
+        tb.appendChild(tr);
+      });
+    }
+
+    function addProfileStep() {
+      const target = parseFloat(document.getElementById("profTarget").value);
+      const minutes = parseFloat(document.getElementById("profMinutes").value);
+      const waitStable = document.getElementById("profWaitStable").value === "1";
+      if (isNaN(target) || target < -30 || target > 150 || isNaN(minutes) || minutes <= 0) return;
+      profileSteps.push({ target, minutes, waitStable });
+      renderProfileTable();
+    }
+
+    function removeProfileStep(i) {
+      if (profRunning) return;
+      profileSteps.splice(i, 1);
+      renderProfileTable();
+    }
+
+    function startProfile() {
+      if (profileSteps.length === 0) return;
+      profRunning = true;
+      profIdx = 0;
+      launchProfileStep(0);
+      document.getElementById("btnProfStart").disabled = true;
+      document.getElementById("btnProfSkip").disabled = false;
+      document.getElementById("btnProfStop").disabled = false;
+      document.getElementById("profLiveBox").style.display = "block";
+      document.getElementById("profStatusBadge").className = "badge connected";
+      document.getElementById("profStatusBadge").textContent = "Running";
+      renderProfileTable();
+    }
+
+    function launchProfileStep(idx) {
+      const st = profileSteps[idx];
+      profPhase = "ramp";
+      profSoakStartTs = 0;
+      document.getElementById("inputSet").value = st.target.toFixed(2);
+      sendCmd("SET:" + st.target.toFixed(2));
+      if (!live.en) sendCmd("EN:1");
+      renderProfileTable();
+    }
+
+    function skipProfileStep() {
+      if (!profRunning) return;
+      advanceProfileStep();
+    }
+
+    function advanceProfileStep() {
+      profIdx++;
+      if (profIdx >= profileSteps.length) {
+        const endAct = document.getElementById("profEndAction").value;
+        if (endAct === "stop") sendCmd("EN:0");
+        stopProfile("Completed");
+      } else {
+        launchProfileStep(profIdx);
+      }
+    }
+
+    function stopProfile(label = "Idle") {
+      profRunning = false;
+      profPhase = "idle";
+      document.getElementById("btnProfStart").disabled = false;
+      document.getElementById("btnProfSkip").disabled = true;
+      document.getElementById("btnProfStop").disabled = true;
+      document.getElementById("profLiveBox").style.display = "none";
+      const b = document.getElementById("profStatusBadge");
+      b.className = label === "Completed" ? "badge connected" : "badge";
+      b.textContent = label;
+      renderProfileTable();
+    }
+
+    function tickProfiler() {
+      if (!profRunning || profIdx >= profileSteps.length) return;
+      const st = profileSteps[profIdx];
+      const err = Math.abs(live.t - st.target);
+      document.getElementById("profStepInfo").textContent =
+        `Step ${profIdx + 1} / ${profileSteps.length} — Target ${st.target.toFixed(2)} °C`;
+
+      if (profPhase === "ramp") {
+        const reached = st.waitStable ? (err <= 0.15 && live.ok) : (err <= 0.10);
+        document.getElementById("profTimer").textContent = "Waiting";
+        document.getElementById("profSubInfo").textContent =
+          `Block ${live.t.toFixed(2)} °C (Δ ${err.toFixed(2)} °C) • ${st.waitStable ? "Waiting for stability" : "Approaching target"}`;
+        document.getElementById("profProgress").style.width = "0%";
+        if (reached) {
+          profPhase = "soak";
+          profSoakStartTs = Date.now();
+        }
+      } else if (profPhase === "soak") {
+        const totalMs = st.minutes * 60000;
+        const elapsedMs = Date.now() - profSoakStartTs;
+        const remSec = Math.max(0, Math.ceil((totalMs - elapsedMs) / 1000));
+        const mm = String(Math.floor(remSec / 60)).padStart(2, "0");
+        const ss = String(remSec % 60).padStart(2, "0");
+        document.getElementById("profTimer").textContent = `${mm}:${ss}`;
+        document.getElementById("profSubInfo").textContent = `Soaking at ${st.target.toFixed(2)} °C`;
+        document.getElementById("profProgress").style.width = `${Math.min(100, (elapsedMs / totalMs) * 100).toFixed(1)}%`;
+        if (elapsedMs >= totalMs) {
+          advanceProfileStep();
         }
       }
     }
-  }
 
-  // ==========================================================================
-  // DUAL-PROBE DATA LOGGER WITH SELECTABLE TIMING INTERVAL
-  // ==========================================================================
-  function onIntervalChange() {
-    const sel = document.getElementById("logIntervalSelect").value;
-    const customInput = document.getElementById("customIntervalSec");
-    if (sel === "custom") {
-      customInput.style.display = "inline-block";
-      const secs = Math.max(1, parseInt(customInput.value, 10) || 1);
-      logIntervalMs = secs * 1000;
-      document.getElementById("nextLogHint").textContent = `Active interval: ${secs}s`;
-    } else {
-      customInput.style.display = "none";
-      logIntervalMs = parseInt(sel, 10);
-      const secs = logIntervalMs / 1000;
-      document.getElementById("nextLogHint").textContent =
-        secs >= 60 ? `Active interval: ${secs / 60}m` : `Active interval: ${secs}s`;
+    // =========================================================================
+    // DATA LOGGER (SELECTABLE INTERVALS + EXCEL EXPORT)
+    // =========================================================================
+    let isLogging = false;
+    let logIntervalSec = 1;
+    let logStartTs = 0;
+    let lastLogTs = 0;
+    const logRows = [];
+
+    function setLogInterval(sec, btn) {
+      logIntervalSec = sec;
+      document.getElementById("customLogSec").value = sec;
+      document.getElementById("logIntervalDisp").textContent = sec >= 60 ? `${sec / 60} min` : `${sec} s`;
+      document.querySelectorAll("#intervalChips .chip").forEach(c => c.classList.remove("active"));
+      if (btn) btn.classList.add("active");
     }
-  }
 
-  function toggleLogging() {
-    isLogging = !isLogging;
-    if (isLogging) lastLogTs = 0; // Log immediately on start
-    const btn = document.getElementById("btnLogToggle");
-    btn.textContent = isLogging ? "Pause Log" : "Start Log";
-    btn.className = isLogging ? "danger sm" : "success sm";
-  }
-
-  function recordLogIfActive() {
-    if (!isLogging) return;
-    const now = Date.now();
-    if (lastLogTs !== 0 && (now - lastLogTs) < logIntervalMs) return;
-    lastLogTs = now;
-
-    const fullTs = new Date().toLocaleString("en-AU", { hour12: false });
-    const shortTime = new Date().toTimeString().slice(0, 8);
-    const extCalVal = state.extValid ? Number(state.extPv.toFixed(2)) : "N/A";
-    const extRawVal = state.extValid ? Number(state.extRaw.toFixed(2)) : "N/A";
-    const deltaVal  = state.extValid ? Number((state.extPv - state.pv).toFixed(2)) : "N/A";
-
-    const row = {
-      Timestamp: fullTs,
-      Interval_Sec: logIntervalMs / 1000,
-      Block_Calibrated_C: Number(state.pv.toFixed(2)),
-      Setpoint_C: Number(state.sp.toFixed(2)),
-      Block_Raw_RTD_C: Number(state.raw.toFixed(2)),
-      External_Calibrated_C: extCalVal,
-      External_Raw_RTD_C: extRawVal,
-      Delta_Ext_Minus_Block_C: deltaVal,
-      Block_Stability_C: Number(state.stab.toFixed(2)),
-      PWM_Pct: Number(state.pwm.toFixed(1))
-    };
-    logRows.push(row);
-    document.getElementById("logCount").textContent = `${logRows.length} rows logged`;
-
-    const tbody = document.getElementById("logTableBody");
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${shortTime}</td>
-      <td>${row.Block_Calibrated_C.toFixed(2)}</td>
-      <td>${row.Setpoint_C.toFixed(2)}</td>
-      <td style="color:${state.extValid ? '#22c55e' : '#94a3b8'};">
-        ${state.extValid ? row.External_Calibrated_C.toFixed(2) : "N/A"}
-      </td>
-      <td>${state.extValid ? (row.Delta_Ext_Minus_Block_C >= 0 ? "+" : "") + row.Delta_Ext_Minus_Block_C.toFixed(2) : "N/A"}</td>
-      <td>${row.PWM_Pct.toFixed(1)}%</td>
-    `;
-    tbody.prepend(tr);
-    if (tbody.children.length > 120) tbody.removeChild(tbody.lastChild);
-  }
-
-  function clearLogs() {
-    logRows = [];
-    lastLogTs = 0;
-    document.getElementById("logTableBody").innerHTML = "";
-    document.getElementById("logCount").textContent = "0 rows logged";
-  }
-
-  function exportExcel() {
-    if (logRows.length === 0) return;
-    const ws = XLSX.utils.json_to_sheet(logRows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Drywell_Dual_Log");
-    const fname = `Drywell_DualLog_${new Date().toISOString().slice(0, 10)}.xlsx`;
-    XLSX.writeFile(wb, fname);
-  }
-
-  // ==========================================================================
-  // PIN-LOCKED DUAL 19-POINT CALIBRATION & ZONE PID
-  // ==========================================================================
-  function unlockPin(section) {
-    const input = document.getElementById(section === "cal" ? "calPinInput" : "pidPinInput");
-    if (input.value === ACCESS_PIN) {
-      document.getElementById(section === "cal" ? "calPinGate" : "pidPinGate").style.display = "none";
-      document.getElementById(section === "cal" ? "calContent" : "pidContent").style.display = "block";
-      input.value = "";
-    } else {
-      input.value = "";
+    function applyCustomLogInterval() {
+      const val = parseInt(document.getElementById("customLogSec").value, 10);
+      if (isNaN(val) || val < 1) return;
+      logIntervalSec = val;
+      document.getElementById("logIntervalDisp").textContent = `${val} s`;
+      document.querySelectorAll("#intervalChips .chip").forEach(c => c.classList.remove("active"));
     }
-  }
 
-  function selectCalTarget(target) {
-    activeCalTarget = target;
-    document.getElementById("btnCalInt").classList.toggle("active", target === "int");
-    document.getElementById("btnCalExt").classList.toggle("active", target === "ext");
-    document.getElementById("calTitle").textContent =
-      target === "int"
-        ? "Internal Block 19-Point Offsets (0.01 °C)"
-        : "External Monitor Probe 19-Point Offsets (0.01 °C)";
-    renderCalTable();
-  }
+    function toggleLogging() {
+      isLogging = !isLogging;
+      const btn = document.getElementById("btnLogToggle");
+      const badge = document.getElementById("logStatusBadge");
+      if (isLogging) {
+        if (logRows.length === 0) logStartTs = Date.now();
+        lastLogTs = 0;
+        btn.textContent = "Pause Log";
+        btn.className = "btn btn-warn";
+        badge.className = "badge connected";
+        badge.textContent = "Recording";
+      } else {
+        btn.textContent = "Resume Log";
+        btn.className = "btn btn-enable";
+        badge.className = "badge warn";
+        badge.textContent = "Paused";
+      }
+    }
 
-  function renderCalTable() {
-    const tbody = document.getElementById("calTableBody");
-    const arr = activeCalTarget === "int" ? intCalOffsets : extCalOffsets;
-    tbody.innerHTML = "";
-    calPoints.forEach((pt, idx) => {
+    function clearLog() {
+      logRows.length = 0;
+      logStartTs = isLogging ? Date.now() : 0;
+      lastLogTs = 0;
+      document.getElementById("logCount").textContent = "0";
+      document.getElementById("logDuration").textContent = "00:00";
+      document.getElementById("logTableBody").innerHTML = "";
+    }
+
+    function tickLogger() {
+      if (!isLogging) return;
+      const now = Date.now();
+      if (lastLogTs !== 0 && (now - lastLogTs) < (logIntervalSec * 1000 - 100)) return;
+      lastLogTs = now;
+
+      const elapsedSec = Math.round((now - logStartTs) / 1000);
+      const timeStr = new Date(now).toLocaleTimeString([], { hour12: false });
+      const delta = live.eok ? Number((live.et - live.t).toFixed(3)) : "";
+
+      const row = {
+        Timestamp: new Date(now).toISOString(),
+        Time: timeStr,
+        Elapsed_s: elapsedSec,
+        Setpoint_C: Number(live.s.toFixed(2)),
+        Internal_Cal_C: Number(live.t.toFixed(3)),
+        Internal_Raw_C: Number(live.r.toFixed(3)),
+        External_Cal_C: live.eok ? Number(live.et.toFixed(3)) : "",
+        External_Raw_C: live.eok ? Number(live.er.toFixed(3)) : "",
+        Delta_Ext_Int_C: delta,
+        Power_Pct: Number(live.p.toFixed(1)),
+        Stability_C: Number(live.st.toFixed(3)),
+        Stable: live.ok ? "YES" : "NO",
+        Zone: live.z
+      };
+      logRows.push(row);
+
+      document.getElementById("logCount").textContent = String(logRows.length);
+      const mm = String(Math.floor(elapsedSec / 60)).padStart(2, "0");
+      const ss = String(elapsedSec % 60).padStart(2, "0");
+      document.getElementById("logDuration").textContent = `${mm}:${ss}`;
+
+      const tb = document.getElementById("logTableBody");
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td>${pt.toFixed(2)} °C</td>
-        <td><input id="calOff_${idx}" type="number" step="0.01" value="${arr[idx].toFixed(2)}" style="width:104px;" /></td>
-        <td><button class="secondary sm" onclick="saveCalRow(${idx})">Save</button></td>
+        <td>${timeStr}</td>
+        <td>${live.s.toFixed(2)}</td>
+        <td>${live.t.toFixed(2)}</td>
+        <td>${live.eok ? live.et.toFixed(2) : "--"}</td>
+        <td>${live.eok ? (live.et - live.t).toFixed(2) : "--"}</td>
+        <td>${live.p.toFixed(0)}%</td>
+        <td>${live.ok ? "OK" : "…"}</td>
       `;
-      tbody.appendChild(tr);
-    });
-  }
-
-  function saveCalRow(idx) {
-    const val = parseFloat(document.getElementById(`calOff_${idx}`).value) || 0;
-    if (activeCalTarget === "int") {
-      intCalOffsets[idx] = val;
-      sendBLE(`CAL:${idx},${val.toFixed(3)}`);
-    } else {
-      extCalOffsets[idx] = val;
-      sendBLE(`ECAL:${idx},${val.toFixed(3)}`);
+      tb.insertBefore(tr, tb.firstChild);
+      if (tb.children.length > 50) tb.removeChild(tb.lastChild);
     }
-  }
 
-  function saveAllCal() {
-    calPoints.forEach((_, idx) => saveCalRow(idx));
-  }
+    function exportExcel() {
+      if (logRows.length === 0) return;
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+      if (typeof XLSX !== "undefined") {
+        const ws = XLSX.utils.json_to_sheet(logRows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Drywell_Log");
+        XLSX.writeFile(wb, `Drywell_Log_${stamp}.xlsx`);
+      } else {
+        // Offline CSV fallback
+        const headers = Object.keys(logRows[0]);
+        const csv = [
+          headers.join(","),
+          ...logRows.map(r => headers.map(h => r[h]).join(","))
+        ].join("\n");
+        const blob = new Blob([csv], { type: "text/csv" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `Drywell_Log_${stamp}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    }
 
-  function renderZoneCards() {
-    const wrap = document.getElementById("zoneCards");
-    wrap.innerHTML = "";
-    zoneConfigs.forEach((z, idx) => {
-      const div = document.createElement("div");
-      div.className = "card";
-      div.style.background = "var(--card-alt)";
-      div.innerHTML = `
-        <div style="font-weight:700; margin-bottom:10px;">${z.name}</div>
-        <div class="zone-grid">
-          <label>Kp<input id="zkp_${idx}" type="number" step="0.1" value="${z.kp}" /></label>
-          <label>Ki<input id="zki_${idx}" type="number" step="0.005" value="${z.ki}" /></label>
-          <label>Kd<input id="zkd_${idx}" type="number" step="0.5" value="${z.kd}" /></label>
-        </div>
-        <button style="width:100%;" onclick="saveZone(${idx})">Save Zone ${idx} to Flash</button>
-      `;
-      wrap.appendChild(div);
-    });
-  }
+    // =========================================================================
+    // DUAL 19-POINT CALIBRATION TABLE (INTERNAL & EXTERNAL)
+    // =========================================================================
+    function buildCalGrid() {
+      const grid = document.getElementById("calGrid");
+      grid.innerHTML = "";
+      const offsets = activeCalProbe === "int" ? intCalOffsets : extCalOffsets;
+      const isExt = activeCalProbe === "ext";
 
-  function saveZone(idx) {
-    const kp = parseFloat(document.getElementById(`zkp_${idx}`).value) || 0;
-    const ki = parseFloat(document.getElementById(`zki_${idx}`).value) || 0;
-    const kd = parseFloat(document.getElementById(`zkd_${idx}`).value) || 0;
-    zoneConfigs[idx] = { ...zoneConfigs[idx], kp, ki, kd };
-    sendBLE(`ZPID:${idx},${kp.toFixed(4)},${ki.toFixed(4)},${kd.toFixed(4)}`);
-  }
+      CAL_TEMPS.forEach((temp, idx) => {
+        const div = document.createElement("div");
+        div.className = "cal-cell";
+        div.innerHTML = `
+          <span class="cal-pt ${isExt ? "ext" : ""}">${temp > 0 ? "+" + temp : temp} °C</span>
+          <input type="number" step="0.005" id="cal_${idx}" value="${offsets[idx].toFixed(3)}" onchange="saveCal(${idx}, this.value)" />
+        `;
+        grid.appendChild(div);
+      });
+    }
 
-  // ==========================================================================
-  // TAB NAVIGATION & INIT
-  // ==========================================================================
-  function switchTab(idx, btn) {
-    document.querySelectorAll("nav.tabs button").forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
-    document.querySelectorAll(".tab-pane").forEach((p, i) => {
-      p.classList.toggle("active", i === idx);
-    });
-    if (idx === 0) drawChart();
-  }
+    function switchCalProbe(which) {
+      activeCalProbe = which;
+      document.getElementById("calTabInt").className = "pill-btn" + (which === "int" ? " active" : "");
+      document.getElementById("calTabExt").className = "pill-btn" + (which === "ext" ? " active ext" : "");
+      buildCalGrid();
+    }
 
-  renderProfileTable();
-  renderCalTable();
-  renderZoneCards();
-</script>
+    function updateCalInput(idx, val) {
+      const inp = document.getElementById("cal_" + idx);
+      if (inp && document.activeElement !== inp) inp.value = Number(val).toFixed(3);
+    }
+
+    function saveCal(idx, val) {
+      const num = parseFloat(val);
+      if (isNaN(num)) return;
+      if (activeCalProbe === "int") {
+        intCalOffsets[idx] = num;
+        sendCmd(`CAL:${idx},${num.toFixed(3)}`);
+      } else {
+        extCalOffsets[idx] = num;
+        sendCmd(`ECAL:${idx},${num.toFixed(3)}`);
+      }
+    }
+
+    function saveAllCurrentCal() {
+      CAL_TEMPS.forEach((_, idx) => {
+        const inp = document.getElementById("cal_" + idx);
+        if (inp) saveCal(idx, inp.value);
+      });
+    }
+
+    function clearCurrentOffsets() {
+      const label = activeCalProbe === "int" ? "INTERNAL control" : "EXTERNAL monitor";
+      if (!confirm(`Zero all 19 calibration offsets for the ${label} probe?`)) return;
+      if (activeCalProbe === "int") {
+        intCalOffsets.fill(0.0);
+        sendCmd("CALCLEAR");
+      } else {
+        extCalOffsets.fill(0.0);
+        sendCmd("ECALCLEAR");
+      }
+      buildCalGrid();
+    }
+
+    // =========================================================================
+    // MULTI-ZONE PID SETTINGS
+    // =========================================================================
+    function saveZonePID(zIdx) {
+      const kp = parseFloat(document.getElementById(`z${zIdx}_kp`).value);
+      const ki = parseFloat(document.getElementById(`z${zIdx}_ki`).value);
+      const kd = parseFloat(document.getElementById(`z${zIdx}_kd`).value);
+      if (!isNaN(kp) && !isNaN(ki) && !isNaN(kd)) {
+        sendCmd(`ZPID:${zIdx},${kp.toFixed(4)},${ki.toFixed(4)},${kd.toFixed(4)}`);
+      }
+    }
+
+    function resetDefaultPIDs() {
+      if (!confirm("Reset all 3 PID zones to factory defaults?")) return;
+      sendCmd("RSTPID");
+    }
+
+    // Initialize UI
+    buildCalGrid();
+    renderProfileTable();
+  </script>
 </body>
 </html>
